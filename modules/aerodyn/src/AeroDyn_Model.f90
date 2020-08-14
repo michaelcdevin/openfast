@@ -17,18 +17,19 @@
 ! limitations under the License.
 !
 !**********************************************************************************************************************************
-program AeroDyn_Driver
+program AeroDyn_Model
 
-   use AeroDyn_Driver_Subs   
+   use AeroDyn_Model_Subs   
     
    implicit none   
    
-      ! Program variables
+   ! Program variables
 
    real(DbKi)                                     :: time                 !< Variable for storing time, in seconds 
    real(DbKi)                                     :: dT_Dvr               !< copy of DT, to make sure AD didn't change it
                                                     
    type(Dvr_SimData)                              :: DvrData              ! The data required for running the AD driver
+   type(AD_InputType)                             :: PhysData             ! Physical model data
    type(AeroDyn_Data)                             :: AD                   ! AeroDyn data 
                                                   
    integer(IntKi)                                 :: iCase                ! loop counter (for driver case)
@@ -37,6 +38,7 @@ program AeroDyn_Driver
    integer(IntKi)                                 :: numSteps             ! number of time steps in the simulation
    integer(IntKi)                                 :: errStat              ! Status of error message
    character(ErrMsgLen)                           :: errMsg               ! Error message if ErrStat /= ErrID_None
+   
 
    !integer                                        :: StrtTime (8)                            ! Start time of simulation (including intialization)
    !integer                                        :: SimStrtTime (8)                         ! Start time of simulation (after initialization)
@@ -64,7 +66,6 @@ program AeroDyn_Driver
    
    
       ! initialize this driver:
-   ! @mcd: remove dT and TMax from here; they will be provided externally
    call Dvr_Init( DvrData, ErrStat, ErrMsg)
       call CheckError()
    
@@ -73,7 +74,7 @@ program AeroDyn_Driver
    
       
       !dT = TwoPi/DvrData%Cases(iCase)%RotSpeed / DvrData%NumSect ! sec
-      ! @mcd: edit TMax and dT accordingly
+      ! @mcd: keep this for now, but it is likely that we will replace the driver file at some point
       numSteps = ceiling( DvrData%Cases(iCase)%TMax / DvrData%Cases(iCase)%dT)      
       dT_Dvr   = DvrData%Cases(iCase)%dT
       
@@ -89,7 +90,6 @@ program AeroDyn_Driver
       
          ! Set the Initialization input data for AeroDyn based on the Driver input file data, and initialize AD
          ! (this also initializes inputs to AD for first time step)
-         ! @mcd: I think the only updates in here is changing the TMax and dT stuff accordingly again
       call Init_AeroDyn(iCase, DvrData, AD, dT_Dvr, errStat, errMsg)
          call CheckError()
          AD_Initialized = .true.
@@ -101,18 +101,21 @@ program AeroDyn_Driver
          end if
                                     
       
-         ! @mcd: either remove this, or heavily modify this with the new output procedure
       call Dvr_InitializeOutputFile( iCase, DvrData%Cases(iCase), DvrData%OutFileData, errStat, errMsg)
          call CheckError()
       
       
       do nt = 1, numSteps
          
+         ! Get current motion information from physical model
+         !!!!! STILL NEED TO WRITE THIS !!!!!
+          call PhysMod_Get_Physical_Motions(PhysData)
+          
          !...............................
-         ! set AD inputs for nt (and keep values at nt-1 as well)
+         ! set AD inputs for nt from physical model (and keep values at nt-1 as well)
          !...............................
-         ! @mcd: lots of updates here too... or maybe not??
-         call Set_AD_Inputs(iCase,nt,DvrData,AD,errStat,errMsg)
+          call Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMsg)
+          call Set_AD_Inflows(iCase,nt,DvrData,AD,errStat,errMsg)  
             call CheckError()
    
          time = AD%InputTime(2)
@@ -122,13 +125,13 @@ program AeroDyn_Driver
          call AD_CalcOutput( time, AD%u(2), AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%y, AD%m, errStat, errMsg )
             call CheckError()
    
-            ! @mcd: figure out where this subroutine is and probably modify it or something
+            ! @mcd: modify this to output every requested time step to its own file
          call Dvr_WriteOutputLine(DvrData%OutFileData, time, AD%y%WriteOutput, errStat, errMsg)
             call CheckError()
             
             
             ! Get state variables at next step: INPUT at step nt - 1, OUTPUT at step nt
-            ! @mcd: look at Dustin's code again about this. I'm pretty sure this has to be updated to an extent.
+            ! @mcd: modify this to remove any interpolation regarding turbine motions (we don't need to do that since we're measuring them directly) 
          call AD_UpdateStates( time, nt-1, AD%u, AD%InputTime, AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%m, errStat, errMsg )
             call CheckError()
       

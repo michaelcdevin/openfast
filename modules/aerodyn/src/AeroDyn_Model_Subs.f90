@@ -26,6 +26,10 @@ module AeroDyn_Driver_Subs
 
    implicit none   
    
+   ! state array indices
+   INTEGER(IntKi), PARAMETER :: current_state           = 1     ! index for current states (i.e. t_global)
+   INTEGER(IntKi), PARAMETER :: predicted_state         = 2     ! index for predicted states (i.e. t_global_next)
+   
    TYPE(ProgDesc), PARAMETER   :: version   = ProgDesc( 'AeroDyn_driver', '', '' )  ! The version number of this program.
                                                     
    contains
@@ -92,24 +96,30 @@ end subroutine Dvr_Init
 subroutine Init_AeroDyn(iCase, DvrData, AD, dt, errStat, errMsg)
 
      ! @mcd: add external input parameters (hubPos, hubOri, possibly velocity/acceleration information)
-   integer(IntKi),               intent(in   ) :: iCase         ! driver case
-   type(Dvr_SimData),            intent(inout) :: DvrData       ! Input data for initialization (intent out for getting AD WriteOutput names/units)
-   type(AeroDyn_Data),           intent(inout) :: AD            ! AeroDyn data 
-   real(DbKi),                   intent(inout) :: dt            ! interval
+   integer(IntKi),                 intent(in   ) :: iCase          ! driver case
+   type(Dvr_SimData),              intent(inout) :: DvrData        ! Input data for initialization (intent out for getting AD WriteOutput names/units)
+   type(AeroDyn_Data),             intent(inout) :: AD             ! AeroDyn data
+   real(R8Ki), dimension(1:3),     intent(in   ) :: hubPos
+   real(R8Ki), dimension(1:3,1:3), intent(in   ) :: hubOri         ! The hub's initial orientation matrix (local to global)
+   !real(R8Ki), dimension(1:3),     intent(in   ) :: hubVel
+   !real(R8Ki), dimension(1:3),     intent(in   ) :: hubAcc
+   !real(R8Ki), dimension(1:3),     intent(in   ) :: hubRotVel
+   !real(R8Ki), dimension(1:3),     intent(in   ) :: hubRotAcc
+   real(DbKi),                     intent(inout) :: dt             ! interval
       
-   integer(IntKi)              , intent(  out) :: errStat       ! Status of error message
-   character(*)                , intent(  out) :: errMsg        ! Error message if ErrStat /= ErrID_None
+   integer(IntKi)                , intent(  out) :: errStat        ! Status of error message
+   character(*)                  , intent(  out) :: errMsg         ! Error message if ErrStat /= ErrID_None
 
       ! locals
-   real(reKi)                                  :: theta(3)
-   integer(IntKi)                              :: j, k   
-   integer(IntKi)                              :: errStat2      ! local status of error message
-   character(ErrMsgLen)                        :: errMsg2       ! local error message if ErrStat /= ErrID_None
-   character(*), parameter                     :: RoutineName = 'Init_AeroDyn'
+   real(reKi)                                    :: theta(3)
+   integer(IntKi)                                :: j, k   
+   integer(IntKi)                                :: errStat2       ! local status of error message
+   character(ErrMsgLen)                          :: errMsg2        ! local error message if ErrStat /= ErrID_None
+   character(*), parameter                       :: RoutineName = 'Init_AeroDyn'
                                                   
    ! local data                                
-   type(AD_InitInputType)                      :: InitInData     ! Input data for initialization
-   type(AD_InitOutputType)                     :: InitOutData    ! Output data from initialization
+   type(AD_InitInputType)                        :: InitInData     ! Input data for initialization
+   type(AD_InitOutputType)                       :: InitOutData    ! Output data from initialization
       
       
       
@@ -132,11 +142,11 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, dt, errStat, errMsg)
       return
    end if
       
-   InitInData%HubPosition = (/ DvrData%Overhang * cos(DvrData%shftTilt), 0.0_ReKi, DvrData%HubHt /) ! @mcd: feed in directly
+   InitInData%HubPosition = 0.0_ReKi ! @mcd: initialize at zero, but change to HubPos in Set_AD_Inputs_Hub (I think? check this.)
    theta(1) = 0.0_ReKi
    theta(2) = -DvrData%shftTilt
    theta(3) = 0.0_ReKi
-   InitInData%HubOrientation = EulerConstruct( theta ) ! @mcd: feed in directly? Figure out what shftTilt actually is
+   InitInData%HubOrientation = EulerConstruct( theta ) ! @mcd: I think this is fine if we're assuming shftTilt=0, but this may change/be fed in directly at some point
      
    
    do k=1,InitInData%numBlades
@@ -149,11 +159,14 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, dt, errStat, errMsg)
       InitInData%BladeRootPosition(:,k)   = InitInData%HubPosition + DvrData%hubRad * InitInData%BladeRootOrientation(3,:,k)      
       
    end do
-      
-      ! @mcd: check Dustin's code to see if they modified this subroutine at all
+
+   ! @mcd: Dustin edited the input args for x, xd, z, and OtherState to be at STATE_CURR. I think it is related to the temporary time stepping methods they use, but keep that in mind for debugging.
    call AD_Init(InitInData, AD%u(1), AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%y, AD%m, dt, InitOutData, ErrStat2, ErrMsg2 )
       call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
-
+   
+   ! @mcd: Dustin also added calls to AD_Copy(Cont/Disc/Constr/Other)State here, I think due to the "temporary steps forward" thing for the loose integration coupling w/ Proteus.
+   !       I don't think I need to add this for our purposes.
+      
    if (ErrStat >= AbortErrLev) then
       call Cleanup()
       return
@@ -191,74 +204,86 @@ contains
    end subroutine cleanup
    
 end subroutine Init_AeroDyn
-!----------------------------------------------------------------------------------------------------------------------------------
-!> this routine returns time=(nt-1) * DvrData%Cases(iCase)%dT, and cycles values in the input array AD%InputTime and AD%u.
-!! it then sets the inputs for nt * DvrData%Cases(iCase)%dT, which are index values 1 in the arrays.
-subroutine Set_AD_Inputs(iCase,nt,DvrData,AD,errStat,errMsg)
 
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine reads the present data from the physical model and formats it into meshes that match the standard for AeroDyn.
+subroutine PhysMod_Get_Physical_Motions(PhysData, MediumDir)
+   type(AD_InputType)          , intent(inout) :: PhysData      ! Physical model data
+   character(*)                , intent(in   ) :: MediumDir     ! Directory where the numerical and physical model interact
+   ! local variables
+   ! ...do I need any local variables?
+   
+   GetPath
+   
+   GetNewUnit
+
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine cycles InputTime values and sets all the AeroDyn motion inputs (no wind inflow values).
+!!  For the time being, wind inflows are handled by Set_AD_Inflows.
+subroutine Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMsg)
    integer(IntKi)              , intent(in   ) :: iCase         ! case number 
    integer(IntKi)              , intent(in   ) :: nt            ! time step number
    
-   type(Dvr_SimData),            intent(inout) :: DvrData       ! Driver data 
-   type(AeroDyn_Data),           intent(inout) :: AD            ! AeroDyn data 
+   type(Dvr_SimData)           , intent(inout) :: DvrData       ! Driver data 
+   type(AeroDyn_Data)          , intent(inout) :: AD            ! AeroDyn data 
+   type(AD_InputType)          , intent(inout) :: PhysData      ! Physical model data
    integer(IntKi)              , intent(  out) :: errStat       ! Status of error message
    character(*)                , intent(  out) :: errMsg        ! Error message if ErrStat /= ErrID_None
 
-      ! local variables
+   ! local variables
    integer(IntKi)                              :: errStat2      ! local status of error message
    character(ErrMsgLen)                        :: errMsg2       ! local error message if ErrStat /= ErrID_None
-   character(*), parameter                     :: RoutineName = 'Set_AD_Inputs'
+   character(*), parameter                     :: RoutineName = 'Set_AD_Motion_Inputs_NoIfW'
 
    integer(intKi)                              :: j             ! loop counter for nodes
    integer(intKi)                              :: k             ! loop counter for blades
 
    real(ReKi)                                  :: z             ! height (m)
-   !real(ReKi)                                  :: angle
    real(R8Ki)                                  :: theta(3)
    real(R8Ki)                                  :: position(3)
    real(R8Ki)                                  :: orientation(3,3)
    real(R8Ki)                                  :: rotateMat(3,3)
+
    
-   
-   errStat = ErrID_None
-   errMsg  = ""
-   
-      ! note that this initialization is a little different than the general algorithm in FAST because here
-      ! we can get exact values, so we are going to ignore initial guesses and not extrapolate
+   ! note that this initialization is a little different than the general algorithm in FAST because here
+   ! we can get exact values, so we are going to ignore initial guesses and not extrapolate
       
    !................
    ! shift previous calculations:
    !................
+   ! @mcd: this sets it so AD%InputTime(2) = (nt-1) * dT, while AD%InputTime(1) = nt * dT (yes, this seems completely backwards but it's what they did)
    do j = numInp-1,1,-1
       call AD_CopyInput (AD%u(j),  AD%u(j+1),  MESH_UPDATECOPY, ErrStat2, ErrMsg2)
          call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
       AD%InputTime(j+1) = AD%InputTime(j)
    end do
-   ! @mcd: address this? We'll probably want the input time to be manually created since it has to link to the physical system, which doesn't have time bounds
+
    AD%inputTime(1) = nt * DvrData%Cases(iCase)%dT
          
-   !................
-   ! calculate new values
-   !................
+   !.........................................
+   ! Set the inputs from the physical model:
+   !.........................................
+      ! @mcd: I may eventually replace everything here with Transfer_Line2_to_Line2 and similar NWTC ModMesh mapping routines.
+      ! @mcd: will PhysData only have data for the time step currently being evaluated, or would it also interpolate its own future values? This will change whether (1) is specified in PhysData meshes.
    
       ! Tower motions:
-      ! @mcd: feed in Orientation and TranslationDisp directly
       do j=1,AD%u(1)%TowerMotion%nnodes
-         AD%u(1)%TowerMotion%Orientation(  :,:,j) = AD%u(1)%TowerMotion%RefOrientation(:,:,j) ! identity
-         AD%u(1)%TowerMotion%TranslationDisp(:,j) = 0.0_ReKi
-         AD%u(1)%TowerMotion%TranslationVel( :,j) = 0.0_ReKi
+         AD%u(1)%TowerMotion%Orientation(  :,:,j) = PhysData%TowerMotion%Orientation(:,:,j)  ! this will likely need to be updated at some point, since the physical model orientation may not capture yaw well.
+         AD%u(1)%TowerMotion%TranslationDisp(:,j) = PhysData%TowerMotion%TranslationDisp(:,j)
+         AD%u(1)%TowerMotion%TranslationVel( :,j) = PhysData%TowerMotion%TranslationVel(:,j)
       end do !j=nnodes
       
       ! Hub motions:
-      ! @mcd: feed in orientation and TranslationDisp directly (or just leave the eqn for TranslationDisp the same and feed in Position directly, wherever that's defined)
+      ! @mcd: Position can be fed in directly, but orientation will still be dependent on controls since this won't be on the physical model.
       theta(1) = 0.0_ReKi
       theta(2) = 0.0_ReKi
       theta(3) = DvrData%Cases(iCase)%Yaw
-      orientation = EulerConstruct(theta)
-            
-      AD%u(1)%HubMotion%TranslationDisp(:,1) = matmul( AD%u(1)%HubMotion%Position(:,1), orientation ) - AD%u(1)%HubMotion%Position(:,1) ! = matmul( transpose(orientation) - eye(3), AD%u(1)%HubMotion%Position(:,1) )
+      orientation = EulerConstruct(theta) 
+      ! AD%u(1)%HubMotion%Orientation(:,:,1) = transpose(PhysData%HubMotion%Orientation(:,:))  |<-- this is what Dustin did... not sure if I should as well 
+      AD%u(1)%HubMotion%Position(:,1) = PhysData%HubMotion%Position(:,1)
+      AD%u(1)%HubMotion%TranslationDisp(:,1) = matmul(AD%u(1)%HubMotion%Position(:,1), orientation) - AD%u(1)%HubMotion%Position(:,1)    
       
-      theta(1) = AD%inputTime(1) * DvrData%Cases(iCase)%RotSpeed
+      theta(1) = AD%inputTime(1) * DvrData%Cases(iCase)%RotSpeed ! this will need to be updated once ServoDyn is incorporated
       theta(2) = 0.0_ReKi
       theta(3) = 0.0_ReKi
       AD%u(1)%HubMotion%Orientation(  :,:,1) = matmul( AD%u(1)%HubMotion%RefOrientation(:,:,1), orientation )
@@ -268,6 +293,7 @@ subroutine Set_AD_Inputs(iCase,nt,DvrData,AD,errStat,errMsg)
       AD%u(1)%HubMotion%RotationVel(    :,1) = AD%u(1)%HubMotion%Orientation(1,:,1) * DvrData%Cases(iCase)%RotSpeed
                   
       ! Blade root motions:
+      ! @mcd: blades will not be physical, so I'm not touching this until we incorporate ServoDyn
       do k=1,DvrData%numBlades         
          theta(1) = (k-1)*TwoPi/real(DvrData%numBlades,ReKi)
          theta(2) =  DvrData%precone
@@ -279,6 +305,7 @@ subroutine Set_AD_Inputs(iCase,nt,DvrData,AD,errStat,errMsg)
       end do !k=numBlades
             
       ! Blade motions:
+      ! @mcd: same deal as blade roots.
       do k=1,DvrData%numBlades
          rotateMat = transpose( AD%u(1)%BladeRootMotion(k)%Orientation(  :,:,1) )
          rotateMat = matmul( rotateMat, AD%u(1)%BladeRootMotion(k)%RefOrientation(  :,:,1) ) 
@@ -301,7 +328,40 @@ subroutine Set_AD_Inputs(iCase,nt,DvrData,AD,errStat,errMsg)
 
          end do !j=nnodes
                                     
-      end do !k=numBlades       
+      end do !k=numBlades      
+   
+end subroutine Set_AD_Motion_Inputs_NoIfW
+
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine cycles inflow values in AD%u. This will soon be replaced once InflowWind is coupled to the numerical model.
+subroutine Set_AD_Inflows(iCase,nt,DvrData,AD,errStat,errMsg)
+
+   integer(IntKi)              , intent(in   ) :: iCase         ! case number 
+   integer(IntKi)              , intent(in   ) :: nt            ! time step number
+   
+   type(Dvr_SimData),            intent(inout) :: DvrData       ! Driver data 
+   type(AeroDyn_Data),           intent(inout) :: AD            ! AeroDyn data 
+   integer(IntKi)              , intent(  out) :: errStat       ! Status of error message
+   character(*)                , intent(  out) :: errMsg        ! Error message if ErrStat /= ErrID_None
+
+   ! local variables
+   integer(IntKi)                              :: errStat2      ! local status of error message
+   character(ErrMsgLen)                        :: errMsg2       ! local error message if ErrStat /= ErrID_None
+   character(*), parameter                     :: RoutineName = 'Set_AD_Inputs'
+
+   integer(intKi)                              :: j             ! loop counter for nodes
+   integer(intKi)                              :: k             ! loop counter for blades
+
+   real(ReKi)                                  :: z             ! height (m)
+   real(R8Ki)                                  :: theta(3)
+   real(R8Ki)                                  :: position(3)
+   real(R8Ki)                                  :: orientation(3,3)
+   real(R8Ki)                                  :: rotateMat(3,3)
+   
+   
+   errStat = ErrID_None
+   errMsg  = ""
+    
       
       ! Inflow wind velocities:
       ! InflowOnBlade
