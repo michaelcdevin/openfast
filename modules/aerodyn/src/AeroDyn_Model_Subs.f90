@@ -93,18 +93,13 @@ subroutine Dvr_Init(DvrData,errStat,errMsg )
       
 end subroutine Dvr_Init 
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine Init_AeroDyn(iCase, DvrData, AD, dt, errStat, errMsg)
+subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, errStat, errMsg)
 
      ! @mcd: add external input parameters (hubPos, hubOri, possibly velocity/acceleration information)
    integer(IntKi),                 intent(in   ) :: iCase          ! driver case
    type(Dvr_SimData),              intent(inout) :: DvrData        ! Input data for initialization (intent out for getting AD WriteOutput names/units)
    type(AeroDyn_Data),             intent(inout) :: AD             ! AeroDyn data
-   real(R8Ki), dimension(1:3),     intent(in   ) :: hubPos
-   real(R8Ki), dimension(1:3,1:3), intent(in   ) :: hubOri         ! The hub's initial orientation matrix (local to global)
-   !real(R8Ki), dimension(1:3),     intent(in   ) :: hubVel
-   !real(R8Ki), dimension(1:3),     intent(in   ) :: hubAcc
-   !real(R8Ki), dimension(1:3),     intent(in   ) :: hubRotVel
-   !real(R8Ki), dimension(1:3),     intent(in   ) :: hubRotAcc
+   type(AeroDyn_Data),             intent(inout) :: PhysData       ! Physical model data
    real(DbKi),                     intent(inout) :: dt             ! interval
       
    integer(IntKi)                , intent(  out) :: errStat        ! Status of error message
@@ -142,11 +137,11 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, dt, errStat, errMsg)
       return
    end if
       
-   InitInData%HubPosition = 0.0_ReKi ! @mcd: initialize at zero, but change to HubPos in Set_AD_Inputs_Hub (I think? check this.)
+   InitInData%HubPosition = 0.0_ReKi ! @mcd: initialize at zero, but change after receiving physical model measurement
    theta(1) = 0.0_ReKi
    theta(2) = -DvrData%shftTilt
    theta(3) = 0.0_ReKi
-   InitInData%HubOrientation = EulerConstruct( theta ) ! @mcd: I think this is fine if we're assuming shftTilt=0, but this may change/be fed in directly at some point
+   InitInData%HubOrientation = EulerConstruct( theta ) ! @mcd: I think this is fine if we're assuming shftTilt=0
      
    
    do k=1,InitInData%numBlades
@@ -163,6 +158,9 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, dt, errStat, errMsg)
    ! @mcd: Dustin edited the input args for x, xd, z, and OtherState to be at STATE_CURR. I think it is related to the temporary time stepping methods they use, but keep that in mind for debugging.
    call AD_Init(InitInData, AD%u(1), AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%y, AD%m, dt, InitOutData, ErrStat2, ErrMsg2 )
       call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+      
+   !!!!! STILL NEED TO WRITE THIS !!!!!
+   call PhysMod_Init(InitInData, PhysData, dt, InitOutData, ErrStat2, ErrMsg2) ! @mcd: not sure if I need InitInData and InitOutData, or different error stuff?
    
    ! @mcd: Dustin also added calls to AD_Copy(Cont/Disc/Constr/Other)State here, I think due to the "temporary steps forward" thing for the loose integration coupling w/ Proteus.
    !       I don't think I need to add this for our purposes.
@@ -181,11 +179,14 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, dt, errStat, errMsg)
       return
    end if
    
+      ! @mcd: get initial physical model measurements
       ! we know exact values, so we're going to initialize inputs this way (instead of using the input guesses from AD_Init)
    AD%InputTime = -999
       ! @mcd: lots of updates in Set_AD_Inputs
    DO j = 1-numInp, 0
-      call Set_AD_Inputs(iCase,j,DvrData,AD,errStat2,errMsg2)   
+      call PhysMod_Get_Physical_Motions(PhysData, MediumDir) !!!!! STILL NEED TO DEFINE MEDIUMDIR SOMEWHERE !!!!!
+      call Set_AD_Motion_Inputs_NoIfW(iCase,j,DvrData,AD,PhysData,errStat,errMsg)
+      call Set_AD_Inflows(iCase,j,DvrData,AD,errStat,errMsg)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    END DO              
    
@@ -206,17 +207,154 @@ contains
 end subroutine Init_AeroDyn
 
 !----------------------------------------------------------------------------------------------------------------------------------
+!> This routine initializes PhysData meshes and variables for use during the simulation.
+subroutine PhysMod_Init(InitInp, PhysData, InitOutData, ErrStat, ErrMsg)
+    type(AD_InitInputType)  ,  intent(in   )  :: InitInp            ! Input data for AD initialization routine
+    type(AD_InputType)      ,  intent(  out)  :: PhysData           ! Physical model data 
+    type(AD_InitOutputType) ,  intent(  out)  :: InitOut            ! Output for initialization routine
+    integer(IntKi)          ,  intent(  out)  :: errStat            ! Error status of the operation
+    character(*)            ,  intent(  out)  :: errMsg             ! Error message if ErrStat /= ErrID_None
+
+    ! Local variables
+    integer(intKi)                            :: ErrStat2           ! Temporary error status
+    character(ErrMsgLen)                      :: ErrMsg2            ! Temporary error message
+    character(*), parameter                   :: RoutineName = 'PhysMod_Init'
+    
+    ! Initialize variables for this routine
+    errStat = ErrID_None
+    errMsg = ""
+    
+    ! Meshes for motion inputs
+    
+        !.............
+        ! tower
+        !.............
+    if (p%NumTwrSensors > 0) then !!!!! NEED TO DEFINE NUMTWRSENSORS SOMEWHERE !!!!!
+        call MeshCreate ( BlankMesh         = PhysData%TowerMotion  &
+                         ,IOS               = COMPONENT_INPUT       &
+                         ,Nnodes            = p%NumTwrSensors       &
+                         ,ErrStat           = ErrStat2              &
+                         ,ErrMess           = ErrMsg2               &
+                         ,Orientation       = .true.                &
+                         ,TranslationDisp   = .true.                &
+                         ,TranslationVel    = .true                 &
+                        )
+            call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+            
+        if (errStat >= AbortErrLev) return
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! set node initial position/orientation
+    position = 0.0_ReKi
+    do j=1,p%NumTwrNds         
+        position(3) = InputFileData%TwrElev(j)
+         
+        call MeshPositionNode(u%TowerMotion, j, position, errStat2, errMsg2)  ! orientation is identity by default
+        call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+    end do !j
+         
+        ! create line2 elements
+    do j=1,p%NumTwrNds-1
+        call MeshConstructElement( u%TowerMotion, ELEMENT_LINE2, errStat2, errMsg2, p1=j, p2=j+1 )
+        call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+    end do !j
+            
+    call MeshCommit(u%TowerMotion, errStat2, errMsg2 )
+        call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+            
+    if (errStat >= AbortErrLev) return
+
+      
+    u%TowerMotion%Orientation     = u%TowerMotion%RefOrientation
+    u%TowerMotion%TranslationDisp = 0.0_R8Ki
+    u%TowerMotion%TranslationVel  = 0.0_ReKi
+      
+    end if ! we compute tower loads
+   
+        !................
+        ! hub
+        !................
+   
+    call MeshCreate ( BlankMesh = u%HubMotion     &
+                    ,IOS       = COMPONENT_INPUT &
+                    ,Nnodes    = 1               &
+                    ,ErrStat   = ErrStat2        &
+                    ,ErrMess   = ErrMsg2         &
+                    ,Orientation     = .true.    &
+                    ,TranslationDisp = .true.    &
+                    ,RotationVel     = .true.    &
+                    )
+        call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+
+    if (errStat >= AbortErrLev) return
+                     
+    call MeshPositionNode(u%HubMotion, 1, InitInp%HubPosition, errStat2, errMsg2, InitInp%HubOrientation)
+        call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+         
+    call MeshConstructElement( u%HubMotion, ELEMENT_POINT, errStat2, errMsg2, p1=1 )
+        call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+            
+    call MeshCommit(u%HubMotion, errStat2, errMsg2 )
+        call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+            
+    if (errStat >= AbortErrLev) return
+
+         
+    u%HubMotion%Orientation     = u%HubMotion%RefOrientation
+    u%HubMotion%TranslationDisp = 0.0_R8Ki
+    u%HubMotion%RotationVel     = 0.0_ReKi   
+!----------------------------------------------------------------------------------------------------------------------------------
 !> This routine reads the present data from the physical model and formats it into meshes that match the standard for AeroDyn.
 subroutine PhysMod_Get_Physical_Motions(PhysData, MediumDir)
    type(AD_InputType)          , intent(inout) :: PhysData      ! Physical model data
-   character(*)                , intent(in   ) :: MediumDir     ! Directory where the numerical and physical model interact
+   character(*), parameter     , intent(in   ) :: MediumDir     ! Directory where the numerical and physical model interact
+   character(*), parameter     , intent(in   ) :: HubDataLoc    ! Location within MediumDir to find the current hub data
+   character(*), parameter     , intent(in   ) :: TowerDataLoc  ! Location within MediumDir to find the current tower data
+   integer(IntKi)              , intent(  out) :: ErrStat       ! Error status
+   character(*)                , intent(  out) :: ErrMsg        ! Error message
+   
    ! local variables
-   ! ...do I need any local variables?
+   character(1024)                             :: HubDataPath   ! Complete path to the current hub data location
+   character(1024)                             :: TowerDataPath ! Complete path to the current tower data location
+   real(:,3), allocatable                      :: AllTowerMotions ! Array containing all values from the file containing tower data
+                                                                  ! each node has 3 lines for Orientation, 1 line each for TranslationDisp and TranslationVel
+   character(*), parameter                     :: RoutineName = 'PhysMod_Get_Physical_Motions'
+   integer                                     :: unIn
    
-   GetPath
    
-   GetNewUnit
+   ! Get paths to physical data locations
+   HubDataPath = MediumDir // '\' // HubDataLoc
+   TowerDataPath = MediumDir // '\' // TowerDataLoc
+   
+   ! Read data from each physical data location
+   GetNewUnit(unIn1) ! hub position
+   GetNewUnit(unIn2) ! tower
+   OpenFInpFile(unIn1, HubDataPath, ErrStat, ErrMsg )
+   OpenFInpFile(unIn2, TowerDataPath, ErrStat, ErrMsg)
+   
+   ! Map data to AeroDyn-readable type (this will probably go through a lot of iteration as I figure out what format the physical model data will be)
+   ! @mcd: not sure how these files would really be formatted, so I'm assuming position followed by orientation for now.
+   read(unIn1, *) PhysData%HubMotion%Position(:,1)
+   read(unIn1, *) PhysData%HubMotion%Orientation(:,:,1)
+   close(unIn1)
+   PhysData%HubMotion%Orientation(:,:,1) = transpose(PhysData%HubMotion%Orientation(:,:)) ! transposing so it's in standard form since Fortran is column-major
+   
+   ! @mcd: I'm doing this by tower node for now, but I doubt we will have enough sensors to analyze many point along the tower, so this will almost certainly change.
+   !       Not to mention the eventual partial integration with ElastoDyn.
+   ! do loop, but we don't know how many nodes there are? then create PhysData%TowerMotion%nnodes
+   read(unIn2, *) AllTowerMotions ! will parse AllTowerMotions down into the proper variables after reading length (since nnodes is unknown a priori)
+   close(unIn2)
 
+   ! The tower data is in format Orientation(3x3), TranslationDisp(1x3), TranslationVel(1x3), working node by node
+   CurrentRow = 1
+   do j = 1, PhysData%TowerMotion%NNodes
+       PhysData%TowerMotion%Orientation(:,:,j) = AllTowerMotions(:, CurrentRow:CurrentRow+2)
+       PhysData%TowerMotion%TranslationDisp(:,j) = AllTowerMotions(:, CurrentRow+3)
+       PhysData%TowerMotion%TranslationVel(:,j) = AllTowerMotions(:, CurrentRow+4)
+       CurrentRow = CurrentRow + 5
+   end do
+   
+   end subroutine PhysMod_Get_Physical_Motions
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine cycles InputTime values and sets all the AeroDyn motion inputs (no wind inflow values).
 !!  For the time being, wind inflows are handled by Set_AD_Inflows.

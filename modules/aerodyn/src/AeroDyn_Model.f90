@@ -108,7 +108,6 @@ program AeroDyn_Model
       do nt = 1, numSteps
          
          ! Get current motion information from physical model
-         !!!!! STILL NEED TO WRITE THIS !!!!!
           call PhysMod_Get_Physical_Motions(PhysData)
           
          !...............................
