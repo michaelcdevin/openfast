@@ -1059,6 +1059,7 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
 
    ! local variables
    type(AD_InputType)                           :: uInterp     ! Interpolated/Extrapolated input
+   logical                                      :: copy_phys   ! flag to determine whether direct measurements should be directly copied (if interpolating)
    integer(intKi)                               :: ErrStat2          ! temporary Error status
    character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
    character(*), parameter                      :: RoutineName = 'AD_UpdateStates'
@@ -1075,15 +1076,18 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
       end if
 
       ! set values of m%BEMT_u(2) from inputs interpolated at t+dt:
-   call AD_Input_ExtrapInterp(u,utimes,uInterp,t+p%DT, errStat2, errMsg2)
+      copy_phys = .false.
+   call AD_Input_ExtrapInterp(u,utimes,uInterp,t+p%DT, copy_phys, errStat2, errMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
    call SetInputs(p, uInterp, m, 2, errStat2, errMsg2)      
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       
       ! set values of m%BEMT_u(1) from inputs (uInterp) interpolated at t:
-      ! I'm doing this second in case we want the other misc vars at t as before, but I don't think it matters      
-   call AD_Input_ExtrapInterp(u,utimes,uInterp, t, errStat2, errMsg2)
+      ! I'm doing this second in case we want the other misc vars at t as before, but I don't think it matters
+      ! @mcd: this call is changed so that direct measurements are copied (not interpolated) into m%BEMT_u(1) since they are exact
+      copy_phys = .true.
+   call AD_Input_ExtrapInterp(u,utimes,uInterp, t, copy_phys errStat2, errMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
    call SetInputs(p, uInterp, m, 1, errStat2, errMsg2)      

@@ -7843,7 +7843,7 @@ ENDIF
  END SUBROUTINE AD_UnPackOutput
 
 
- SUBROUTINE AD_Input_ExtrapInterp(u, t, u_out, t_out, ErrStat, ErrMsg )
+ SUBROUTINE AD_Input_ExtrapInterp(u, t, u_out, t_out, copy_phys, ErrStat, ErrMsg )
 !
 ! This subroutine calculates a extrapolated (or interpolated) Input u_out at time t_out, from previous/future time
 ! values of u (which has values associated with times in t).  Order of the interpolation is given by the size of u
@@ -7865,6 +7865,7 @@ ENDIF
  REAL(DbKi),                 INTENT(IN   )  :: t_out           ! time to be extrap/interp'd to
  INTEGER(IntKi),             INTENT(  OUT)  :: ErrStat         ! Error status of the operation
  CHARACTER(*),               INTENT(  OUT)  :: ErrMsg          ! Error message if ErrStat /= ErrID_None
+ LOGICAL,                    INTENT(IN   )  :: copy_phys       ! .true. means HubMotion and TowerMotion are copied, not interpolated.
    ! local variables
  INTEGER(IntKi)                             :: order           ! order of polynomial fit (max 2)
  INTEGER(IntKi)                             :: ErrStat2        ! local errors
@@ -7882,10 +7883,10 @@ ENDIF
    CALL AD_CopyInput(u(1), u_out, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
  ELSE IF ( order .eq. 1 ) THEN
-   CALL AD_Input_ExtrapInterp1(u(1), u(2), t, u_out, t_out, ErrStat2, ErrMsg2 )
+   CALL AD_Input_ExtrapInterp1(u(1), u(2), t, u_out, t_out, copy_phys, ErrStat2, ErrMsg2 )
      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
  ELSE IF ( order .eq. 2 ) THEN
-   CALL AD_Input_ExtrapInterp2(u(1), u(2), u(3), t, u_out, t_out, ErrStat2, ErrMsg2 )
+   CALL AD_Input_ExtrapInterp2(u(1), u(2), u(3), t, u_out, t_out, copy_phys, ErrStat2, ErrMsg2 )
      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
  ELSE 
    CALL SetErrStat(ErrID_Fatal,'size(u) must be less than 4 (order must be less than 3).',ErrStat,ErrMsg,RoutineName)
@@ -7894,7 +7895,7 @@ ENDIF
  END SUBROUTINE AD_Input_ExtrapInterp
 
 
- SUBROUTINE AD_Input_ExtrapInterp1(u1, u2, tin, u_out, tin_out, ErrStat, ErrMsg )
+ SUBROUTINE AD_Input_ExtrapInterp1(u1, u2, tin, u_out, tin_out, copy_phys, ErrStat, ErrMsg )
 !
 ! This subroutine calculates a extrapolated (or interpolated) Input u_out at time t_out, from previous/future time
 ! values of u (which has values associated with times in t).  Order of the interpolation is 1.
@@ -7911,6 +7912,7 @@ ENDIF
  REAL(DbKi),         INTENT(IN   )          :: tin(2)   ! Times associated with the Inputs
  TYPE(AD_InputType), INTENT(INOUT)  :: u_out ! Input at tin_out
  REAL(DbKi),         INTENT(IN   )          :: tin_out  ! time to be extrap/interp'd to
+ LOGICAL,            INTENT(IN   )          :: copy_phys! .true. means HubMotion and TowerMotion are copied, not interpolated.    
  INTEGER(IntKi),     INTENT(  OUT)          :: ErrStat  ! Error status of the operation
  CHARACTER(*),       INTENT(  OUT)          :: ErrMsg   ! Error message if ErrStat /= ErrID_None
    ! local variables
@@ -7940,10 +7942,18 @@ ENDIF
      CALL SetErrStat(ErrID_Fatal, 't(1) must not equal t(2) to avoid a division-by-zero error.', ErrStat, ErrMsg,RoutineName)
      RETURN
    END IF
+   ! @mcd: When interpolating, the direct measurements from the physical model should be ignored since these are exact.
+   IF copy_phys THEN
+      CALL AD_CopyInput(u2%TowerMotion, u_out%TowerMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 ) ! @mcd: make sure using AD_CopyInput in this way is correct
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+      CALL AD_CopyInput(u2%HubMotion, u_out%HubMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 ) ! @mcd: same here
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   ELSE
       CALL MeshExtrapInterp1(u1%TowerMotion, u2%TowerMotion, tin, u_out%TowerMotion, tin_out, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
       CALL MeshExtrapInterp1(u1%HubMotion, u2%HubMotion, tin, u_out%HubMotion, tin_out, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+    END IF
 IF (ALLOCATED(u_out%BladeRootMotion) .AND. ALLOCATED(u1%BladeRootMotion)) THEN
   DO i01 = LBOUND(u_out%BladeRootMotion,1),UBOUND(u_out%BladeRootMotion,1)
       CALL MeshExtrapInterp1(u1%BladeRootMotion(i01), u2%BladeRootMotion(i01), tin, u_out%BladeRootMotion(i01), tin_out, ErrStat2, ErrMsg2 )
@@ -7985,7 +7995,7 @@ END IF ! check if allocated
  END SUBROUTINE AD_Input_ExtrapInterp1
 
 
- SUBROUTINE AD_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, ErrStat, ErrMsg )
+ SUBROUTINE AD_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, copy_phys, ErrStat, ErrMsg )
 !
 ! This subroutine calculates a extrapolated (or interpolated) Input u_out at time t_out, from previous/future time
 ! values of u (which has values associated with times in t).  Order of the interpolation is 2.
@@ -8005,6 +8015,7 @@ END IF ! check if allocated
  REAL(DbKi),                 INTENT(IN   )  :: tin(3)    ! Times associated with the Inputs
  TYPE(AD_InputType), INTENT(INOUT)  :: u_out     ! Input at tin_out
  REAL(DbKi),                 INTENT(IN   )  :: tin_out   ! time to be extrap/interp'd to
+ LOGICAL,            INTENT(IN   )          :: copy_phys ! .true. means HubMotion and TowerMotion are copied, not interpolated.    
  INTEGER(IntKi),             INTENT(  OUT)  :: ErrStat   ! Error status of the operation
  CHARACTER(*),               INTENT(  OUT)  :: ErrMsg    ! Error message if ErrStat /= ErrID_None
    ! local variables
@@ -8041,10 +8052,18 @@ END IF ! check if allocated
      CALL SetErrStat(ErrID_Fatal, 't(1) must not equal t(3) to avoid a division-by-zero error.', ErrStat, ErrMsg,RoutineName)
      RETURN
    END IF
-      CALL MeshExtrapInterp2(u1%TowerMotion, u2%TowerMotion, u3%TowerMotion, tin, u_out%TowerMotion, tin_out, ErrStat2, ErrMsg2 )
+   ! @mcd: When interpolating, the direct measurements from the physical model should be ignored since these are exact.
+   IF copy_phys THEN
+      CALL AD_CopyInput(u2%TowerMotion, u_out%TowerMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 ) ! @mcd: make sure using AD_CopyInput in this way is correct
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
-      CALL MeshExtrapInterp2(u1%HubMotion, u2%HubMotion, u3%HubMotion, tin, u_out%HubMotion, tin_out, ErrStat2, ErrMsg2 )
+      CALL AD_CopyInput(u2%HubMotion, u_out%HubMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 ) ! @mcd: same here
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   ELSE
+      CALL MeshExtrapInterp1(u1%TowerMotion, u2%TowerMotion, tin, u_out%TowerMotion, tin_out, ErrStat2, ErrMsg2 )
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+      CALL MeshExtrapInterp1(u1%HubMotion, u2%HubMotion, tin, u_out%HubMotion, tin_out, ErrStat2, ErrMsg2 )
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+    END IF
 IF (ALLOCATED(u_out%BladeRootMotion) .AND. ALLOCATED(u1%BladeRootMotion)) THEN
   DO i01 = LBOUND(u_out%BladeRootMotion,1),UBOUND(u_out%BladeRootMotion,1)
       CALL MeshExtrapInterp2(u1%BladeRootMotion(i01), u2%BladeRootMotion(i01), u3%BladeRootMotion(i01), tin, u_out%BladeRootMotion(i01), tin_out, ErrStat2, ErrMsg2 )

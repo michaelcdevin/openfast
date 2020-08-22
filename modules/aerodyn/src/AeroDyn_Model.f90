@@ -90,7 +90,7 @@ program AeroDyn_Model
       
          ! Set the Initialization input data for AeroDyn based on the Driver input file data, and initialize AD
          ! (this also initializes inputs to AD for first time step)
-      call Init_AeroDyn(iCase, DvrData, AD, dT_Dvr, errStat, errMsg)
+      call Init_AeroDyn(iCase, DvrData, AD, PhysData, dT_Dvr, errStat, errMsg)
          call CheckError()
          AD_Initialized = .true.
          
@@ -100,7 +100,7 @@ program AeroDyn_Model
             call CheckError()
          end if
                                     
-      
+      ! @mcd: may modify this if we decide we don't need an output file for the hybrid model, just at every time step (although I think we are, at least for validation)
       call Dvr_InitializeOutputFile( iCase, DvrData%Cases(iCase), DvrData%OutFileData, errStat, errMsg)
          call CheckError()
       
@@ -112,6 +112,7 @@ program AeroDyn_Model
           
          !...............................
          ! set AD inputs for nt from physical model (and keep values at nt-1 as well)
+         ! @mcd: I think this may require splitting up these routines between things that are measured directly (which don't need to be interpolated) and the things that do.
          !...............................
           call Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMsg)
           call Set_AD_Inflows(iCase,nt,DvrData,AD,errStat,errMsg)  
@@ -130,7 +131,7 @@ program AeroDyn_Model
             
             
             ! Get state variables at next step: INPUT at step nt - 1, OUTPUT at step nt
-            ! @mcd: modify this to remove any interpolation regarding turbine motions (we don't need to do that since we're measuring them directly) 
+            ! @mcd: modify this to remove any interpolation/extrapolation regarding turbine motions (we don't need to do that since we're measuring them directly) 
          call AD_UpdateStates( time, nt-1, AD%u, AD%InputTime, AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%m, errStat, errMsg )
             call CheckError()
       
