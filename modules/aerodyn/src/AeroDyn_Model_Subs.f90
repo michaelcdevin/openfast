@@ -211,7 +211,7 @@ end subroutine Init_AeroDyn
 
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine initializes PhysData meshes and variables for use during the simulation.
-subroutine PhysMod_Init(InitInp, PhysData, ErrStat, ErrMsg)
+subroutine PhysMod_Init(u, p, InputFileData, InitInp, PhysData, ErrStat, ErrMsg)
     type(AD_InitInputType)  ,  intent(in   )  :: InitInp            ! Input data for AD initialization routine
     type(AD_InputType)      ,  intent(  out)  :: PhysData           ! Physical model data
     integer(IntKi)          ,  intent(  out)  :: errStat            ! Error status of the operation
@@ -248,7 +248,7 @@ subroutine PhysMod_Init(InitInp, PhysData, ErrStat, ErrMsg)
     ! set node initial position/orientation
     position = 0.0_ReKi
     do j=1,p%NumTwrNds 
-        position(3) = InputFileData%SensorElev(j) !!!!! NEED TO DEFINE SENSORELEV IN THE INPUT FILE + IN THE SOURCE CODE !!!!!
+        position(3) = InputFileData%TwrElev(j) ! @mcd: TwrElev in AD input file should match sensor locations on physical model
          
         call MeshPositionNode(PhysData%TowerMotion, j, position, errStat2, errMsg2)  ! orientation is identity by default
         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
@@ -301,7 +301,7 @@ subroutine PhysMod_Init(InitInp, PhysData, ErrStat, ErrMsg)
     if (errStat >= AbortErrLev) return
 
          
-    PhysData%HubMotion%Orientation     = u%HubMotion%RefOrientation
+    PhysData%HubMotion%Orientation     = PhysData%HubMotion%RefOrientation
     PhysData%HubMotion%TranslationDisp = 0.0_ReKi ! @mcd: originally was 0.0_R8Ki, but changed it to match what Set_AD_Inputs initially sets. Keep in mind for debugging.
     PhysData%HubMotion%RotationVel     = 0.0_ReKi
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -401,8 +401,7 @@ subroutine Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMs
    !.........................................
    ! Set the inputs from the physical model:
    !.........................................
-      ! @mcd: I may eventually replace everything here with Transfer_Line2_to_Line2 and similar NWTC ModMesh mapping routines.
-      ! @mcd: will PhysData only have data for the time step currently being evaluated, or would it also interpolate its own future values? This will change whether (1) is specified in PhysData meshes.
+      ! @mcd: I will eventually replace much of this section with material similar to AD_InputSolve_NoIfW from the FAST solution once I start incorporating other modules
    
       ! Tower motions:
       do j=1,AD%u(1)%TowerMotion%nnodes
@@ -416,8 +415,7 @@ subroutine Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMs
       theta(1) = 0.0_ReKi
       theta(2) = 0.0_ReKi
       theta(3) = DvrData%Cases(iCase)%Yaw
-      orientation = EulerConstruct(theta) 
-      ! AD%u(1)%HubMotion%Orientation(:,:,1) = transpose(PhysData%HubMotion%Orientation(:,:))  |<-- this is what Dustin did... not sure if I should as well 
+      orientation = EulerConstruct(theta)
       AD%u(1)%HubMotion%Position(:,1) = PhysData%HubMotion%Position(:,1)
       AD%u(1)%HubMotion%TranslationDisp(:,1) = matmul(AD%u(1)%HubMotion%Position(:,1), orientation) - AD%u(1)%HubMotion%Position(:,1)    
       
@@ -471,7 +469,7 @@ subroutine Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMs
 end subroutine Set_AD_Motion_Inputs_NoIfW
 
 !----------------------------------------------------------------------------------------------------------------------------------
-!> This routine cycles inflow values in AD%u. This will soon be replaced once InflowWind is coupled to the numerical model.
+!> This routine cycles inflow values in AD%u. This will soon be replaced with AD_InputSolve_IfW from the FAST solution once InflowWind is coupled to the numerical model.
 subroutine Set_AD_Inflows(iCase,nt,DvrData,AD,errStat,errMsg)
 
    integer(IntKi)              , intent(in   ) :: iCase         ! case number 
@@ -485,7 +483,7 @@ subroutine Set_AD_Inflows(iCase,nt,DvrData,AD,errStat,errMsg)
    ! local variables
    integer(IntKi)                              :: errStat2      ! local status of error message
    character(ErrMsgLen)                        :: errMsg2       ! local error message if ErrStat /= ErrID_None
-   character(*), parameter                     :: RoutineName = 'Set_AD_Inputs'
+   character(*), parameter                     :: RoutineName = 'Set_AD_Inflows'
 
    integer(intKi)                              :: j             ! loop counter for nodes
    integer(intKi)                              :: k             ! loop counter for blades
