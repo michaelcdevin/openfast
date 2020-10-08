@@ -40,6 +40,8 @@ IMPLICIT NONE
 ! =========  AD_InitInputType  =======
   TYPE, PUBLIC :: AD_InitInputType
     CHARACTER(1024)  :: InputFile      !< Name of the input file [-]
+    CHARACTER(1024)  :: Phys_HubFile      !< Name of file containing current physical hub data [-]
+    CHARACTER(1024)  :: Phys_TwrFile      !< Name of file containing current physical tower data [-]
     LOGICAL  :: Linearize = .FALSE.      !< Flag that tells this module if the glue code wants to linearize. [-]
     INTEGER(IntKi)  :: NumBlades      !< Number of blades on the turbine [-]
     REAL(ReKi)  :: Gravity      !< Gravity force [Nm/s^2]
@@ -7944,9 +7946,9 @@ ENDIF
    END IF
    ! @mcd: When interpolating, the direct measurements from the physical model should be ignored since these are exact.
    IF copy_phys THEN
-      CALL AD_CopyInput(u2%TowerMotion, u_out%TowerMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 ) ! @mcd: make sure using AD_CopyInput in this way is correct
+      CALL AD_CopyInput(u2%TowerMotion, u_out%TowerMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
-      CALL AD_CopyInput(u2%HubMotion, u_out%HubMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 ) ! @mcd: same here
+      CALL AD_CopyInput(u2%HubMotion, u_out%HubMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    ELSE
       CALL MeshExtrapInterp1(u1%TowerMotion, u2%TowerMotion, tin, u_out%TowerMotion, tin_out, ErrStat2, ErrMsg2 )
@@ -8054,9 +8056,9 @@ END IF ! check if allocated
    END IF
    ! @mcd: When interpolating, the direct measurements from the physical model should be ignored since these are exact.
    IF copy_phys THEN
-      CALL AD_CopyInput(u2%TowerMotion, u_out%TowerMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 ) ! @mcd: make sure using AD_CopyInput in this way is correct
+      CALL AD_CopyInput(u2%TowerMotion, u_out%TowerMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
-      CALL AD_CopyInput(u2%HubMotion, u_out%HubMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 ) ! @mcd: same here
+      CALL AD_CopyInput(u2%HubMotion, u_out%HubMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    ELSE
       CALL MeshExtrapInterp1(u1%TowerMotion, u2%TowerMotion, tin, u_out%TowerMotion, tin_out, ErrStat2, ErrMsg2 )

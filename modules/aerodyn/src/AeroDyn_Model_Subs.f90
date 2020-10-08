@@ -93,14 +93,15 @@ subroutine Dvr_Init(DvrData,errStat,errMsg )
       
 end subroutine Dvr_Init 
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, errStat, errMsg)
+subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, Phys_HubFile, Phys_TwrFile, errStat, errMsg)
 
-     ! @mcd: add external input parameters (hubPos, hubOri, possibly velocity/acceleration information)
    integer(IntKi),                 intent(in   ) :: iCase          ! driver case
    type(Dvr_SimData),              intent(inout) :: DvrData        ! Input data for initialization (intent out for getting AD WriteOutput names/units)
    type(AeroDyn_Data),             intent(inout) :: AD             ! AeroDyn data
    type(AeroDyn_Data),             intent(inout) :: PhysData       ! Physical model data
    real(DbKi),                     intent(inout) :: dt             ! interval
+   character(*)                    intent(  out) :: Phys_HubFile   ! Name of file containing current physical hub data
+   character(*)                    intent(  out) :: Phys_TwrFile   ! Name of file containing current physical tower data
       
    integer(IntKi)                , intent(  out) :: errStat        ! Status of error message
    character(*)                  , intent(  out) :: errMsg         ! Error message if ErrStat /= ErrID_None
@@ -142,6 +143,10 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, errStat, errMsg)
    theta(2) = -DvrData%shftTilt
    theta(3) = 0.0_ReKi
    InitInData%HubOrientation = EulerConstruct( theta ) ! @mcd: I think this is fine if we're assuming shftTilt=0
+   
+   ! @mcd: these variables might be better suited within a type, but I'll leave it like this for now.
+   Phys_HubFile = DvrData%Phys_HubFile
+   Phys_TwrFile = DvrData%Phys_TwrFile
      
    
    do k=1,InitInData%numBlades
@@ -298,14 +303,13 @@ subroutine PhysMod_Init(InitInp, PhysData, ErrStat, ErrMsg)
          
     PhysData%HubMotion%Orientation     = u%HubMotion%RefOrientation
     PhysData%HubMotion%TranslationDisp = 0.0_ReKi ! @mcd: originally was 0.0_R8Ki, but changed it to match what Set_AD_Inputs initially sets. Keep in mind for debugging.
-    PhysData%HubMotion%RotationVel     = 0.0_ReKi   
+    PhysData%HubMotion%RotationVel     = 0.0_ReKi
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine reads the present data from the physical model and formats it into meshes that match the standard for AeroDyn.
-subroutine PhysMod_Get_Physical_Motions(PhysData, MediumDir)
+subroutine PhysMod_Get_Physical_Motions(PhysData, Phys_HubFile, Phys_TwrFile, ErrStat, ErrMsg)
    type(AD_InputType)          , intent(inout) :: PhysData      ! Physical model data
-   character(*), parameter     , intent(in   ) :: MediumDir     ! Directory where the numerical and physical model interact
-   character(*), parameter     , intent(in   ) :: HubDataLoc    ! Location within MediumDir to find the current hub data
-   character(*), parameter     , intent(in   ) :: TowerDataLoc  ! Location within MediumDir to find the current tower data
+   character(*), parameter     , intent(in   ) :: Phys_HubFile  ! Location within MediumDir to find the current hub data
+   character(*), parameter     , intent(in   ) :: Phys_TwrFile  ! Location within MediumDir to find the current tower data
    integer(IntKi)              , intent(  out) :: ErrStat       ! Error status
    character(*)                , intent(  out) :: ErrMsg        ! Error message
    
@@ -315,29 +319,29 @@ subroutine PhysMod_Get_Physical_Motions(PhysData, MediumDir)
    real(:,3), allocatable                      :: AllTowerMotions ! Array containing all values from the file containing tower data
                                                                   ! each node has 3 lines for Orientation, 1 line each for TranslationDisp and TranslationVel
    character(*), parameter                     :: RoutineName = 'PhysMod_Get_Physical_Motions'
-   integer                                     :: unIn
+   integer                                     :: unIn1
+   integer                                     :: unIn2
    
-   
-   ! Get paths to physical data locations
-   HubDataPath = MediumDir // '\' // HubDataLoc
-   TowerDataPath = MediumDir // '\' // TowerDataLoc
    
    ! Read data from each physical data location
    GetNewUnit(unIn1) ! hub position
    GetNewUnit(unIn2) ! tower
-   OpenFInpFile(unIn1, HubDataPath, ErrStat, ErrMsg )
-   OpenFInpFile(unIn2, TowerDataPath, ErrStat, ErrMsg)
+   OpenFInpFile(unIn1, Phys_HubFile, ErrStat, ErrMsg )
+   OpenFInpFile(unIn2, Phys_TwrFile, ErrStat, ErrMsg)
    
-   ! Map data to AeroDyn-readable type (this will probably go through a lot of iteration as I figure out what format the physical model data will be)
-   ! @mcd: not sure how these files would really be formatted, so I'm assuming position followed by orientation for now.
+   ! Map data to AeroDyn-readable type
    read(unIn1, *) PhysData%HubMotion%Position(:,1)
-   read(unIn1, *) PhysData%HubMotion%Orientation(:,:,1)
+   do j = 1, 3
+       read(unIn1, *) PhysData%HubMotion%Orientation(:,j,1)
+   end do
    close(unIn1)
    PhysData%HubMotion%Orientation(:,:,1) = transpose(PhysData%HubMotion%Orientation(:,:)) ! transposing so it's in standard form since Fortran is column-major
    
    ! @mcd: I'm doing this by tower node for now, but I doubt we will have enough sensors to analyze many point along the tower, so this will almost certainly change.
    !       Not to mention the eventual partial integration with ElastoDyn.
-   read(unIn2, *) AllTowerMotions ! will parse AllTowerMotions down into the proper variables after reading length (since nnodes is unknown a priori)
+   do j = 1, PhysData%TowerMotion%NNodes*5
+       read(unIn2, *) AllTowerMotions(:, j) ! will parse AllTowerMotions down into the proper variables after reading length
+   end do
    close(unIn2)
 
    ! The tower data is in format Orientation(3x3), TranslationDisp(1x3), TranslationVel(1x3), working node by node
@@ -348,6 +352,7 @@ subroutine PhysMod_Get_Physical_Motions(PhysData, MediumDir)
        PhysData%TowerMotion%TranslationVel(:,j) = AllTowerMotions(:, CurrentRow+4)
        CurrentRow = CurrentRow + 5
    end do
+
    
    end subroutine PhysMod_Get_Physical_Motions
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -515,7 +520,7 @@ subroutine Set_AD_Inflows(iCase,nt,DvrData,AD,errStat,errMsg)
          AD%u(1)%InflowOnTower(3,j) = 0.0_ReKi !W         
       end do !j=nnodes
                      
-end subroutine Set_AD_Inputs
+end subroutine Set_AD_Inflows
 !----------------------------------------------------------------------------------------------------------------------------------
 function GetU( URef, ZRef, PLExp, z ) result (U)
    real(ReKi), intent(in) :: URef
@@ -628,6 +633,21 @@ subroutine Dvr_ReadInputFile(fileName, DvrData, errStat, errMsg )
       end if
    IF ( PathIsRelative( DvrData%AD_InputFile ) ) DvrData%AD_InputFile = TRIM(PriPath)//TRIM(DvrData%AD_InputFile)
 
+   call ReadVar ( unIn, fileName, DvrData%Phys_HubFile,   'Phys_HubFile',   'Name of file containing current physical hub data', errStat2, errMsg2, UnEc )
+      call setErrStat( errStat2, ErrMsg2 , errStat, ErrMsg , RoutineName )
+      if ( errStat >= AbortErrLev ) then
+         call cleanup()
+         return
+      end if
+   IF ( PathIsRelative( DvrData%Phys_HubFile ) ) DvrData%Phys_HubFile = TRIM(PriPath)//TRIM(DvrData%Phys_HubFile)
+   
+   call ReadVar ( unIn, fileName, DvrData%Phys_TwrFile,   'Phys_TwrFile',   'Name of file containing current physical tower data', errStat2, errMsg2, UnEc )
+      call setErrStat( errStat2, ErrMsg2 , errStat, ErrMsg , RoutineName )
+      if ( errStat >= AbortErrLev ) then
+         call cleanup()
+         return
+      end if
+   IF ( PathIsRelative( DvrData%Phys_TwrFile ) ) DvrData%Phys_TwrFile = TRIM(PriPath)//TRIM(DvrData%Phys_TwrFile)
    
       ! Read the turbine-data section.
 

@@ -78,6 +78,8 @@ IMPLICIT NONE
 ! =========  Dvr_SimData  =======
   TYPE, PUBLIC :: Dvr_SimData
     character(1024)  :: AD_InputFile      !< Name of AeroDyn input file [-]
+    character(1024)  :: Phys_HubFile      !< Name of file containing current physical hub data [-]
+    character(1024)  :: Phys_TwrFile      !< Name of file containing current physical tower data [-]
     INTEGER(IntKi)  :: numBlades      !< number of blades on turbine [-]
     REAL(ReKi)  :: hubRad      !< Hub radius [m]
     REAL(ReKi)  :: hubHt      !< Hub height [m]
