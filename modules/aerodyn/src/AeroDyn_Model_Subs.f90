@@ -195,7 +195,6 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, Phys_HubFile, Phys_Twr
    
       
       ! move AD initOut data to AD Driver
-      ! @mcd: not sure if we need this? Still need to figure out how output is working
    call move_alloc( InitOutData%WriteOutputHdr, DvrData%OutFileData%WriteOutputHdr )
    call move_alloc( InitOutData%WriteOutputUnt, DvrData%OutFileData%WriteOutputUnt )   
      
@@ -803,11 +802,12 @@ subroutine ValidateInputs(DvrData, errStat, errMsg)
    
 end subroutine ValidateInputs
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine Dvr_WriteOutputLine(OutFileData, t, output, errStat, errMsg)
+subroutine Dvr_WriteOutputLine(OutFileData, t, output, HybUn errStat, errMsg)
 
    real(DbKi)             ,  intent(in   )   :: t                    ! simulation time (s)
    type(Dvr_OutputFile)   ,  intent(in   )   :: OutFileData
    real(ReKi)             ,  intent(in   )   :: output(:)            ! Rootname for the output file
+   integer                ,  intent(in   )   :: HybUn                ! Unit for hybrid interface file
    integer(IntKi)         ,  intent(inout)   :: errStat              ! Status of error message
    character(*)           ,  intent(inout)   :: errMsg               ! Error message if ErrStat /= ErrID_None
       
@@ -825,7 +825,8 @@ subroutine Dvr_WriteOutputLine(OutFileData, t, output, errStat, errMsg)
       ! time
    write( tmpStr, '(F15.4)' ) t
    call WrFileNR( OutFileData%unOutFile, tmpStr )
-   call WrNumAryFileNR ( OutFileData%unOutFile, output,  frmt, errStat, errMsg )
+   call WrNumAryFileNR ( OutFileData%unOutFile, output,  frmt, errStat, errMsg ) ! @mcd: normal output file
+   call WrNumAryFileNR(HybUn, output, frmt, errStat, errMsg) ! @mcd: hybrid interface output file
    if ( errStat >= AbortErrLev ) return
    
      ! write a new line (advance to the next line)
@@ -903,4 +904,81 @@ subroutine Dvr_InitializeOutputFile( iCase, CaseData, OutFileData, errStat, errM
       
 end subroutine Dvr_InitializeOutputFile
 !----------------------------------------------------------------------------------------------------------------------------------
+! This is a modification of Dvr_InitializeOutputFile, where an extra file is created as the actual output interface used in the hybrid model
+subroutine Dvr_InitializeHybridOutputFiles( iCase, CaseData, OutFileData, HybUn, errStat, errMsg)
+      type(Dvr_OutputFile),     intent(inout)   :: OutFileData 
+      
+      integer(IntKi)         ,  intent(in   )   :: iCase                ! case number (to write in file description line and use for file name)
+      type(Dvr_Case),           intent(in   )   :: CaseData
+      
+      integer                ,  intent(  out)   :: HybUn                ! Logical unit for the hybrid interface file.
+      integer(IntKi)         ,  intent(  out)   :: errStat              ! Status of error message
+      character(*)           ,  intent(  out)   :: errMsg               ! Error message if ErrStat /= ErrID_None
+
+         ! locals
+      integer(IntKi)                            ::  i      
+      integer(IntKi)                            :: numOuts
+      
+      
+      ! Create normal output file
+      call GetNewUnit( OutFileData%unOutFile, ErrStat, ErrMsg )
+         if ( ErrStat >= AbortErrLev ) then
+            OutFileData%unOutFile = -1
+            return
+         end if
+         
+      call OpenFOutFile ( OutFileData%unOutFile, trim(outFileData%Root)//'.'//trim(num2lstr(iCase))//'.out', ErrStat, ErrMsg )
+         if ( ErrStat >= AbortErrLev ) return
+         
+      write (OutFileData%unOutFile,'(/,A)')  'Predictions were generated on '//CurDate()//' at '//CurTime()//' using '//trim(GetNVD(version))
+      write (OutFileData%unOutFile,'(1X,A)') trim(GetNVD(OutFileData%AD_ver))
+      write (OutFileData%unOutFile,'()' )    !print a blank line
+     ! write (OutFileData%unOutFile,'(A,11(1x,A,"=",ES11.4e2,1x,A))'   ) 'Case '//trim(num2lstr(iCase))//':' &
+      write (OutFileData%unOutFile,'(A,11(1x,A,"=",A,1x,A))'   ) 'Case '//trim(num2lstr(iCase))//':' &
+         , 'WndSpeed', trim(num2lstr(CaseData%WndSpeed)), 'm/s;' &
+         , 'ShearExp', trim(num2lstr(CaseData%ShearExp)), ';' &
+         , 'RotSpeed', trim(num2lstr(CaseData%RotSpeed*RPS2RPM)),'rpm;' &
+         , 'Pitch',    trim(num2lstr(CaseData%Pitch*R2D)), 'deg;' &
+         , 'Yaw',      trim(num2lstr(CaseData%Yaw*R2D)), 'deg;' &
+         , 'dT',       trim(num2lstr(CaseData%dT)), 's;' &
+         , 'Tmax',     trim(num2lstr(CaseData%Tmax)),'s'
+      
+      write (OutFileData%unOutFile,'()' )    !print a blank line
+              
+
+      numOuts = size(OutFileData%WriteOutputHdr)
+         !......................................................
+         ! Write the names of the output parameters on one line:
+         !......................................................
+
+      call WrFileNR ( OutFileData%unOutFile, '     Time           ' )
+
+      do i=1,NumOuts
+         call WrFileNR ( OutFileData%unOutFile, OutFileData%delim//OutFileData%WriteOutputHdr(i) )
+      end do ! i
+
+      write (OutFileData%unOutFile,'()')
+
+         !......................................................
+         ! Write the units of the output parameters on one line:
+         !......................................................
+
+      call WrFileNR ( OutFileData%unOutFile, '      (s)           ' )
+
+      do i=1,NumOuts
+         call WrFileNR ( OutFileData%unOutFile, OutFileData%delim//OutFileData%WriteOutputUnt(i) )
+      end do ! i
+
+      write (OutFileData%unOutFile,'()')      
+      
+     ! Create hybrid interface output file
+      call GetNewUnit(HybUn, ErrStat, ErrMsg)
+         if ( ErrStat >= AbortErrLev ) then
+            HybUn = -1
+            return
+         end if
+
+      
+end subroutine Dvr_InitializeOutputFile
+
 end module AeroDyn_Driver_Subs

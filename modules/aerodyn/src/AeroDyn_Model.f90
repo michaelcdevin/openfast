@@ -39,8 +39,9 @@ program AeroDyn_Model
    integer(IntKi)                                 :: errStat              ! Status of error message
    character(ErrMsgLen)                           :: errMsg               ! Error message if ErrStat /= ErrID_None
    
-   character(1024)                                :: MediumDir            ! Directory containing the current data from the physical model                     
-   
+   character(1024)                                :: Phys_HubFile         ! Name of file containing current physical hub data
+   character(1024)                                :: Phys_TwrFile         ! Name of file containing current physical tower data                   
+   integer                                        :: HybUn                ! Logical unit for the hybrid interface file.
 
    !integer                                        :: StrtTime (8)                            ! Start time of simulation (including intialization)
    !integer                                        :: SimStrtTime (8)                         ! Start time of simulation (after initialization)
@@ -102,12 +103,16 @@ program AeroDyn_Model
             call CheckError()
          end if
                                     
-      ! @mcd: may modify this if we decide we don't need an output file for the hybrid model, just at every time step (although I think we are, at least for validation)
-      call Dvr_InitializeOutputFile( iCase, DvrData%Cases(iCase), DvrData%OutFileData, errStat, errMsg)
+      ! @mcd: this is modified so there are two output files: one normal, one that is read by the physical model and continuously updated
+      call Dvr_InitializeHybridOutputFiles( iCase, DvrData%Cases(iCase), DvrData%OutFileData, HybUn, errStat, errMsg)
          call CheckError()
       
       
       do nt = 1, numSteps
+          
+          ! Open hybrid interface file
+          call OpenFOutFile (HybUn, 'num_mod_outputs.out', ErrStat, ErrMsg )
+            call CheckError()
          
          ! Get current motion information from physical model
           call PhysMod_Get_Physical_Motions(PhysData, Phys_HubFile, Phys_TwrFile, ErrStat, ErrMsg)
@@ -126,7 +131,7 @@ program AeroDyn_Model
          call AD_CalcOutput( time, AD%u(2), AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%y, AD%m, errStat, errMsg )
             call CheckError()
    
-            ! @mcd: modify this to output every requested time step to its own file
+            ! @mcd: this is modified to write output to both normal output file and hybrid interface file
          call Dvr_WriteOutputLine(DvrData%OutFileData, time, AD%y%WriteOutput, errStat, errMsg)
             call CheckError()
             
@@ -136,6 +141,9 @@ program AeroDyn_Model
             call CheckError()
       
                   
+            ! Close and delete current hybrid interface file
+            close(HybUn, status=DELETE)
+            
       end do !nt=1,numSteps
       
       call AD_End( AD%u(1), AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%y, AD%m, errStat, errMsg )
