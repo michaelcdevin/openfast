@@ -333,6 +333,8 @@ subroutine PhysMod_Get_Physical_Motions(PhysData, Phys_HubFile, Phys_TwrFile, Er
    do j = 1, 3
        read(unIn1, *) PhysData%HubMotion%Orientation(:,j,1)
    end do
+   read(unIn1, *) PhysData%HubMotion%TranslationDisp(:,1)
+   read(unIn1, *) PhysData%HubMotion%RotationVel(:,1)
    close(unIn1)
    PhysData%HubMotion%Orientation(:,:,1) = transpose(PhysData%HubMotion%Orientation(:,:)) ! transposing so it's in standard form since Fortran is column-major
    
@@ -346,10 +348,11 @@ subroutine PhysMod_Get_Physical_Motions(PhysData, Phys_HubFile, Phys_TwrFile, Er
    ! The tower data is in format Orientation(3x3), TranslationDisp(1x3), TranslationVel(1x3), working node by node
    CurrentRow = 1
    do j = 1, PhysData%TowerMotion%NNodes
-       PhysData%TowerMotion%Orientation(:,:,j) = AllTowerMotions(:, CurrentRow:CurrentRow+2)
-       PhysData%TowerMotion%TranslationDisp(:,j) = AllTowerMotions(:, CurrentRow+3)
-       PhysData%TowerMotion%TranslationVel(:,j) = AllTowerMotions(:, CurrentRow+4)
-       CurrentRow = CurrentRow + 5
+       PhysData%TowerMotion%Position(:,j) = AllTowerMotions(:, CurrentRow)
+       PhysData%TowerMotion%Orientation(:,:,j) = AllTowerMotions(:, CurrentRow+1:CurrentRow+3)
+       PhysData%TowerMotion%TranslationDisp(:,j) = AllTowerMotions(:, CurrentRow+4)
+       PhysData%TowerMotion%TranslationVel(:,j) = AllTowerMotions(:, CurrentRow+5)
+       CurrentRow = CurrentRow + 6
    end do
 
    
@@ -404,6 +407,7 @@ subroutine Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMs
    
       ! Tower motions:
       do j=1,AD%u(1)%TowerMotion%nnodes
+         AD%u(1)%TowerMotion%Position(       :,j) = PhysData%TowerMotion%Position(:,j)
          AD%u(1)%TowerMotion%Orientation(  :,:,j) = PhysData%TowerMotion%Orientation(:,:,j)  ! this will likely need to be updated at some point, since the physical model orientation may not capture yaw well.
          AD%u(1)%TowerMotion%TranslationDisp(:,j) = PhysData%TowerMotion%TranslationDisp(:,j)
          AD%u(1)%TowerMotion%TranslationVel( :,j) = PhysData%TowerMotion%TranslationVel(:,j)
