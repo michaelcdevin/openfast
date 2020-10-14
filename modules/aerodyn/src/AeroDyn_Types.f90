@@ -7945,11 +7945,9 @@ ENDIF
      RETURN
    END IF
    ! @mcd: When interpolating, the direct measurements from the physical model should be ignored since these are exact.
-   IF copy_phys THEN
-      CALL AD_CopyInput(u2%TowerMotion, u_out%TowerMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
-      CALL AD_CopyInput(u2%HubMotion, u_out%HubMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   IF (copy_phys) THEN
+       u_out%HubMotion = u2%HubMotion
+       u_out%TowerMotion = u2%TowerMotion
    ELSE
       CALL MeshExtrapInterp1(u1%TowerMotion, u2%TowerMotion, tin, u_out%TowerMotion, tin_out, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
@@ -8055,10 +8053,10 @@ END IF ! check if allocated
      RETURN
    END IF
    ! @mcd: When interpolating, the direct measurements from the physical model should be ignored since these are exact.
-   IF copy_phys THEN
-      CALL AD_CopyInput(u2%TowerMotion, u_out%TowerMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
-        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
-      CALL AD_CopyInput(u2%HubMotion, u_out%HubMotion, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
+   IF (copy_phys) THEN
+       u_out%HubMotion = u3%HubMotion
+       u_out%TowerMotion = u3%TowerMotion
+      CALL AD_CopyInput(u2, u_out, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    ELSE
       CALL MeshExtrapInterp1(u1%TowerMotion, u2%TowerMotion, tin, u_out%TowerMotion, tin_out, ErrStat2, ErrMsg2 )

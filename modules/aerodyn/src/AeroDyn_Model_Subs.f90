@@ -100,8 +100,8 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, Phys_HubFile, Phys_Twr
    type(AeroDyn_Data),             intent(inout) :: AD             ! AeroDyn data
    type(AeroDyn_Data),             intent(inout) :: PhysData       ! Physical model data
    real(DbKi),                     intent(inout) :: dt             ! interval
-   character(*)                    intent(  out) :: Phys_HubFile   ! Name of file containing current physical hub data
-   character(*)                    intent(  out) :: Phys_TwrFile   ! Name of file containing current physical tower data
+   character(*),                   intent(  out) :: Phys_HubFile   ! Name of file containing current physical hub data
+   character(*),                   intent(  out) :: Phys_TwrFile   ! Name of file containing current physical tower data
       
    integer(IntKi)                , intent(  out) :: errStat        ! Status of error message
    character(*)                  , intent(  out) :: errMsg         ! Error message if ErrStat /= ErrID_None
@@ -164,7 +164,7 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, Phys_HubFile, Phys_Twr
    call AD_Init(InitInData, AD%u(1), AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%y, AD%m, dt, InitOutData, ErrStat2, ErrMsg2 )
       call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
       
-   call PhysMod_Init(InitInData, PhysData, ErrStat2, ErrMsg2)
+   call PhysMod_Init(AD%p, InitInData, InitOutData, PhysData, ErrStat2, ErrMsg2)
    
    ! @mcd: Dustin also added calls to AD_Copy(Cont/Disc/Constr/Other)State here, I think due to the "temporary steps forward" thing for the loose integration coupling w/ Proteus.
    !       I don't think I need to add this for our purposes.
@@ -210,8 +210,10 @@ end subroutine Init_AeroDyn
 
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine initializes PhysData meshes and variables for use during the simulation.
-subroutine PhysMod_Init(u, p, InputFileData, InitInp, PhysData, ErrStat, ErrMsg)
+subroutine PhysMod_Init(p, InitInp, InitOut, PhysData, ErrStat, ErrMsg)
+    type(AD_ParameterType)  ,  intent(in   )  :: p                  ! Parameters
     type(AD_InitInputType)  ,  intent(in   )  :: InitInp            ! Input data for AD initialization routine
+    type(AD_InitOutputType) ,  intent(in   )  :: InitOut            ! Output data from initialization
     type(AD_InputType)      ,  intent(  out)  :: PhysData           ! Physical model data
     integer(IntKi)          ,  intent(  out)  :: errStat            ! Error status of the operation
     character(*)            ,  intent(  out)  :: errMsg             ! Error message if ErrStat /= ErrID_None
@@ -238,7 +240,7 @@ subroutine PhysMod_Init(u, p, InputFileData, InitInp, PhysData, ErrStat, ErrMsg)
                          ,ErrMess           = ErrMsg2               &
                          ,Orientation       = .true.                &
                          ,TranslationDisp   = .true.                &
-                         ,TranslationVel    = .true                 &
+                         ,TranslationVel    = .true.                &
                         )
             call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
             
@@ -247,7 +249,7 @@ subroutine PhysMod_Init(u, p, InputFileData, InitInp, PhysData, ErrStat, ErrMsg)
     ! set node initial position/orientation
     position = 0.0_ReKi
     do j=1,p%NumTwrNds 
-        position(3) = InputFileData%TwrElev(j) ! @mcd: TwrElev in AD input file should match sensor locations on physical model
+        position(3) = InitOut%TwrElev(j) ! @mcd: TwrElev in AD input file should match sensor locations on physical model
          
         call MeshPositionNode(PhysData%TowerMotion, j, position, errStat2, errMsg2)  ! orientation is identity by default
         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
@@ -315,7 +317,7 @@ subroutine PhysMod_Get_Physical_Motions(PhysData, Phys_HubFile, Phys_TwrFile, Er
    ! local variables
    character(1024)                             :: HubDataPath   ! Complete path to the current hub data location
    character(1024)                             :: TowerDataPath ! Complete path to the current tower data location
-   real(:,3), allocatable                      :: AllTowerMotions ! Array containing all values from the file containing tower data
+   real(:,3), allocatable,                     :: AllTowerMotions ! Array containing all values from the file containing tower data
                                                                   ! each node has 3 lines for Orientation, 1 line each for TranslationDisp and TranslationVel
    character(*), parameter                     :: RoutineName = 'PhysMod_Get_Physical_Motions'
    integer                                     :: unIn1
@@ -323,10 +325,10 @@ subroutine PhysMod_Get_Physical_Motions(PhysData, Phys_HubFile, Phys_TwrFile, Er
    
    
    ! Read data from each physical data location
-   GetNewUnit(unIn1) ! hub position
-   GetNewUnit(unIn2) ! tower
-   OpenFInpFile(unIn1, Phys_HubFile, ErrStat, ErrMsg )
-   OpenFInpFile(unIn2, Phys_TwrFile, ErrStat, ErrMsg)
+   call GetNewUnit(unIn1) ! hub position
+   call GetNewUnit(unIn2) ! tower
+   call OpenFInpFile(unIn1, Phys_HubFile, ErrStat, ErrMsg )
+   call OpenFInpFile(unIn2, Phys_TwrFile, ErrStat, ErrMsg)
    
    ! Map data to AeroDyn-readable type
    read(unIn1, *) PhysData%HubMotion%Position(:,1)
@@ -806,7 +808,7 @@ subroutine ValidateInputs(DvrData, errStat, errMsg)
    
 end subroutine ValidateInputs
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine Dvr_WriteOutputLine(OutFileData, t, output, HybUn errStat, errMsg)
+subroutine Dvr_WriteOutputLine(OutFileData, t, output, HybUn, errStat, errMsg)
 
    real(DbKi)             ,  intent(in   )   :: t                    ! simulation time (s)
    type(Dvr_OutputFile)   ,  intent(in   )   :: OutFileData
