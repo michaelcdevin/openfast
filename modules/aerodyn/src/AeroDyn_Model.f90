@@ -41,7 +41,9 @@ program AeroDyn_Model
    
    character(1024)                                :: Phys_HubFile         ! Name of file containing current physical hub data
    character(1024)                                :: Phys_TwrFile         ! Name of file containing current physical tower data                   
-   integer                                        :: HybUn                ! Logical unit for the hybrid interface file.
+   integer                                        :: OutUn                ! Unit for the output hybrid file.
+   integer                                        :: HubUn                ! Unit for the input hub file
+   integer                                        :: TwrUn                ! Unit for the input tower file
 
    !integer                                        :: StrtTime (8)                            ! Start time of simulation (including intialization)
    !integer                                        :: SimStrtTime (8)                         ! Start time of simulation (after initialization)
@@ -103,20 +105,28 @@ program AeroDyn_Model
             call CheckError()
          end if
                                     
-      ! @mcd: this is modified so there are two output files: one normal, one that is read by the physical model and continuously updated
-      call Dvr_InitializeHybridOutputFiles( iCase, DvrData%Cases(iCase), DvrData%OutFileData, HybUn, errStat, errMsg)
+        ! @mcd: Get units for hybrid interface files
+      call GetNewUnit(HubUn) ! hub input file
+      call GetNewUnit(TwrUn) ! tower input file
+      call GetNewUnit(OutUn) ! force output file
+      
+      call Dvr_InitializeOutputFiles( iCase, DvrData%Cases(iCase), DvrData%OutFileData, errStat, errMsg)
          call CheckError()
       
       
       do nt = 1, numSteps
           
-          ! Open hybrid interface file
-          call OpenFOutFile (HybUn, 'num_mod_outputs.out', ErrStat, ErrMsg )
-            call CheckError()
+          ! Open hybrid interface files
+          call OpenFInpFile(HubUn, Phys_HubFile, ErrStat, ErrMsg )
+             call CheckError()
+          call OpenFInpFile(TwrUn, Phys_TwrFile, ErrStat, ErrMsg)
+             call CheckError()
+          call OpenFOutFile (OutUn, 'num_mod_outputs.out', ErrStat, ErrMsg )
+             call CheckError()
             
          
          ! Get current motion information from physical model
-          call PhysMod_Get_Physical_Motions(PhysData, Phys_HubFile, Phys_TwrFile, ErrStat, ErrMsg)
+          call PhysMod_Get_Physical_Motions(PhysData, HubUn, TwrUn)
           
          !...............................
          ! set AD inputs for nt from physical model (and keep values at nt-1 as well)
@@ -133,7 +143,7 @@ program AeroDyn_Model
             call CheckError()
    
             ! @mcd: this is modified to write output to both normal output file and hybrid interface file
-         call Dvr_WriteOutputLine(DvrData%OutFileData, time, AD%y%WriteOutput, errStat, errMsg)
+         call Dvr_WriteOutputLine(DvrData%OutFileData, time, AD%y%WriteOutput, OutUn, errStat, errMsg)
             call CheckError()
             
             
@@ -142,8 +152,10 @@ program AeroDyn_Model
             call CheckError()
       
                   
-            ! Close and delete current hybrid interface file
-            close(HybUn, status=DELETE)
+            ! Close and delete current hybrid interface files
+            close(HubUn, STATUS='DELETE')
+            close(TwrUn, STATUS='DELETE')
+            close(OutUn, STATUS='DELETE')
             
       end do !nt=1,numSteps
       
@@ -207,5 +219,5 @@ contains
       
    end subroutine Dvr_End
 !................................   
-end program AeroDyn_Driver
+end program AeroDyn_Model
    

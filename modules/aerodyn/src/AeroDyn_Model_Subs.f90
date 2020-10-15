@@ -18,7 +18,7 @@
 ! limitations under the License.
 !
 !**********************************************************************************************************************************
-module AeroDyn_Driver_Subs
+module AeroDyn_Model_Subs
    
    use AeroDyn_Driver_Types   
    use AeroDyn
@@ -98,7 +98,7 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, Phys_HubFile, Phys_Twr
    integer(IntKi),                 intent(in   ) :: iCase          ! driver case
    type(Dvr_SimData),              intent(inout) :: DvrData        ! Input data for initialization (intent out for getting AD WriteOutput names/units)
    type(AeroDyn_Data),             intent(inout) :: AD             ! AeroDyn data
-   type(AeroDyn_Data),             intent(inout) :: PhysData       ! Physical model data
+   type(AD_InputType),             intent(inout) :: PhysData       ! Physical model data
    real(DbKi),                     intent(inout) :: dt             ! interval
    character(*),                   intent(  out) :: Phys_HubFile   ! Name of file containing current physical hub data
    character(*),                   intent(  out) :: Phys_TwrFile   ! Name of file containing current physical tower data
@@ -219,6 +219,8 @@ subroutine PhysMod_Init(p, InitInp, InitOut, PhysData, ErrStat, ErrMsg)
     character(*)            ,  intent(  out)  :: errMsg             ! Error message if ErrStat /= ErrID_None
 
     ! Local variables
+    integer                                   :: j, k               ! loop variables
+    real(reKi)                                :: position(3)        ! node reference position
     integer(intKi)                            :: ErrStat2           ! Temporary error status
     character(ErrMsgLen)                      :: ErrMsg2            ! Temporary error message
     character(*), parameter                   :: RoutineName = 'PhysMod_Init'
@@ -256,8 +258,8 @@ subroutine PhysMod_Init(p, InitInp, InitOut, PhysData, ErrStat, ErrMsg)
     end do !j
          
     ! create line2 elements
-    do j=1,p%NumTwrNds-1
-        call MeshConstructElement(PhysData%TowerMotion, ELEMENT_LINE2, errStat2, errMsg2, p1=j, p2=j+1)
+    do k=1,p%NumTwrNds-1
+        call MeshConstructElement(PhysData%TowerMotion, ELEMENT_LINE2, errStat2, errMsg2, p1=k, p2=k+1)
         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
     end do !j
             
@@ -305,58 +307,41 @@ subroutine PhysMod_Init(p, InitInp, InitOut, PhysData, ErrStat, ErrMsg)
     PhysData%HubMotion%Orientation     = PhysData%HubMotion%RefOrientation
     PhysData%HubMotion%TranslationDisp = 0.0_ReKi ! @mcd: originally was 0.0_R8Ki, but changed it to match what Set_AD_Inputs initially sets. Keep in mind for debugging.
     PhysData%HubMotion%RotationVel     = 0.0_ReKi
+    
+    end subroutine PhysMod_Init
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine reads the present data from the physical model and formats it into meshes that match the standard for AeroDyn.
-subroutine PhysMod_Get_Physical_Motions(PhysData, Phys_HubFile, Phys_TwrFile, ErrStat, ErrMsg)
+subroutine PhysMod_Get_Physical_Motions(PhysData, HubUn, TwrUn)
    type(AD_InputType)          , intent(inout) :: PhysData      ! Physical model data
-   character(*), parameter     , intent(in   ) :: Phys_HubFile  ! Location within MediumDir to find the current hub data
-   character(*), parameter     , intent(in   ) :: Phys_TwrFile  ! Location within MediumDir to find the current tower data
-   integer(IntKi)              , intent(  out) :: ErrStat       ! Error status
-   character(*)                , intent(  out) :: ErrMsg        ! Error message
+   integer                     , intent(in   ) :: HubUn         ! Unit for the input hub file
+   integer                     , intent(in   ) :: TwrUn         ! Unit for the input tower file
    
    ! local variables
-   character(1024)                             :: HubDataPath   ! Complete path to the current hub data location
-   character(1024)                             :: TowerDataPath ! Complete path to the current tower data location
-   real(:,3), allocatable,                     :: AllTowerMotions ! Array containing all values from the file containing tower data
-                                                                  ! each node has 3 lines for Orientation, 1 line each for TranslationDisp and TranslationVel
    character(*), parameter                     :: RoutineName = 'PhysMod_Get_Physical_Motions'
-   integer                                     :: unIn1
-   integer                                     :: unIn2
-   
-   
-   ! Read data from each physical data location
-   call GetNewUnit(unIn1) ! hub position
-   call GetNewUnit(unIn2) ! tower
-   call OpenFInpFile(unIn1, Phys_HubFile, ErrStat, ErrMsg )
-   call OpenFInpFile(unIn2, Phys_TwrFile, ErrStat, ErrMsg)
+   integer                                     :: j, k
    
    ! Map data to AeroDyn-readable type
-   read(unIn1, *) PhysData%HubMotion%Position(:,1)
+   ! The hub data is in format Position(1x3), Orientation(3x3), TranslationDisp(1x3), RotationVel(1x3)
+   read(HubUn, *) PhysData%HubMotion%Position(:,1)
    do j = 1, 3
-       read(unIn1, *) PhysData%HubMotion%Orientation(:,j,1)
+       read(HubUn1, *) PhysData%HubMotion%Orientation(:,j,1)
    end do
-   read(unIn1, *) PhysData%HubMotion%TranslationDisp(:,1)
-   read(unIn1, *) PhysData%HubMotion%RotationVel(:,1)
-   close(unIn1)
-   PhysData%HubMotion%Orientation(:,:,1) = transpose(PhysData%HubMotion%Orientation(:,:)) ! transposing so it's in standard form since Fortran is column-major
+   read(HubUn, *) PhysData%HubMotion%TranslationDisp(:,1)
+   read(HubUn, *) PhysData%HubMotion%RotationVel(:,1)
+   close(HubUn)
    
    ! @mcd: I'm doing this by tower node for now, but I doubt we will have enough sensors to analyze many point along the tower, so this will almost certainly change.
    !       Not to mention the eventual partial integration with ElastoDyn.
-   do j = 1, PhysData%TowerMotion%NNodes*5
-       read(unIn2, *) AllTowerMotions(:, j) ! will parse AllTowerMotions down into the proper variables after reading length
-   end do
-   close(unIn2)
-
-   ! The tower data is in format Orientation(3x3), TranslationDisp(1x3), TranslationVel(1x3), working node by node
-   CurrentRow = 1
+   ! The tower data is in format Position(1x3), Orientation(3x3), TranslationDisp(1x3), TranslationVel(1x3), working node by node
    do j = 1, PhysData%TowerMotion%NNodes
-       PhysData%TowerMotion%Position(:,j) = AllTowerMotions(:, CurrentRow)
-       PhysData%TowerMotion%Orientation(:,:,j) = AllTowerMotions(:, CurrentRow+1:CurrentRow+3)
-       PhysData%TowerMotion%TranslationDisp(:,j) = AllTowerMotions(:, CurrentRow+4)
-       PhysData%TowerMotion%TranslationVel(:,j) = AllTowerMotions(:, CurrentRow+5)
-       CurrentRow = CurrentRow + 6
+       read(TwrUn, *) PhysData%TowerMotion%Position(:,j)
+       do k = 1, 3
+           read(TwrUn, *) PhysData%TowerMotion%Orientation(:,k,j)
+       end do
+       read(TwrUn, *) PhysData%TowerMotion%TranslationDisp(:,j)
+       read(TwrUn, *) PhysData%TowerMotion%TranslationVel(:,j)
    end do
-
+   close(TwrUn)
    
    end subroutine PhysMod_Get_Physical_Motions
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -808,12 +793,12 @@ subroutine ValidateInputs(DvrData, errStat, errMsg)
    
 end subroutine ValidateInputs
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine Dvr_WriteOutputLine(OutFileData, t, output, HybUn, errStat, errMsg)
+subroutine Dvr_WriteOutputLine(OutFileData, t, output, OutUn, errStat, errMsg)
 
    real(DbKi)             ,  intent(in   )   :: t                    ! simulation time (s)
    type(Dvr_OutputFile)   ,  intent(in   )   :: OutFileData
    real(ReKi)             ,  intent(in   )   :: output(:)            ! Rootname for the output file
-   integer                ,  intent(in   )   :: HybUn                ! Unit for hybrid interface file
+   integer                ,  intent(in   )   :: OutUn                ! Unit for the output hybrid file.
    integer(IntKi)         ,  intent(inout)   :: errStat              ! Status of error message
    character(*)           ,  intent(inout)   :: errMsg               ! Error message if ErrStat /= ErrID_None
       
@@ -832,7 +817,7 @@ subroutine Dvr_WriteOutputLine(OutFileData, t, output, HybUn, errStat, errMsg)
    write( tmpStr, '(F15.4)' ) t
    call WrFileNR( OutFileData%unOutFile, tmpStr )
    call WrNumAryFileNR ( OutFileData%unOutFile, output,  frmt, errStat, errMsg ) ! @mcd: normal output file
-   call WrNumAryFileNR(HybUn, output, frmt, errStat, errMsg) ! @mcd: hybrid interface output file
+   call WrNumAryFileNR(OutUn, output, frmt, errStat, errMsg) ! @mcd: hybrid interface output file
    if ( errStat >= AbortErrLev ) return
    
      ! write a new line (advance to the next line)
@@ -909,82 +894,5 @@ subroutine Dvr_InitializeOutputFile( iCase, CaseData, OutFileData, errStat, errM
 
       
 end subroutine Dvr_InitializeOutputFile
-!----------------------------------------------------------------------------------------------------------------------------------
-! This is a modification of Dvr_InitializeOutputFile, where an extra file is created as the actual output interface used in the hybrid model
-subroutine Dvr_InitializeHybridOutputFiles( iCase, CaseData, OutFileData, HybUn, errStat, errMsg)
-      type(Dvr_OutputFile),     intent(inout)   :: OutFileData 
-      
-      integer(IntKi)         ,  intent(in   )   :: iCase                ! case number (to write in file description line and use for file name)
-      type(Dvr_Case),           intent(in   )   :: CaseData
-      
-      integer                ,  intent(  out)   :: HybUn                ! Logical unit for the hybrid interface file.
-      integer(IntKi)         ,  intent(  out)   :: errStat              ! Status of error message
-      character(*)           ,  intent(  out)   :: errMsg               ! Error message if ErrStat /= ErrID_None
 
-         ! locals
-      integer(IntKi)                            ::  i      
-      integer(IntKi)                            :: numOuts
-      
-      
-      ! Create normal output file
-      call GetNewUnit( OutFileData%unOutFile, ErrStat, ErrMsg )
-         if ( ErrStat >= AbortErrLev ) then
-            OutFileData%unOutFile = -1
-            return
-         end if
-         
-      call OpenFOutFile ( OutFileData%unOutFile, trim(outFileData%Root)//'.'//trim(num2lstr(iCase))//'.out', ErrStat, ErrMsg )
-         if ( ErrStat >= AbortErrLev ) return
-         
-      write (OutFileData%unOutFile,'(/,A)')  'Predictions were generated on '//CurDate()//' at '//CurTime()//' using '//trim(GetNVD(version))
-      write (OutFileData%unOutFile,'(1X,A)') trim(GetNVD(OutFileData%AD_ver))
-      write (OutFileData%unOutFile,'()' )    !print a blank line
-     ! write (OutFileData%unOutFile,'(A,11(1x,A,"=",ES11.4e2,1x,A))'   ) 'Case '//trim(num2lstr(iCase))//':' &
-      write (OutFileData%unOutFile,'(A,11(1x,A,"=",A,1x,A))'   ) 'Case '//trim(num2lstr(iCase))//':' &
-         , 'WndSpeed', trim(num2lstr(CaseData%WndSpeed)), 'm/s;' &
-         , 'ShearExp', trim(num2lstr(CaseData%ShearExp)), ';' &
-         , 'RotSpeed', trim(num2lstr(CaseData%RotSpeed*RPS2RPM)),'rpm;' &
-         , 'Pitch',    trim(num2lstr(CaseData%Pitch*R2D)), 'deg;' &
-         , 'Yaw',      trim(num2lstr(CaseData%Yaw*R2D)), 'deg;' &
-         , 'dT',       trim(num2lstr(CaseData%dT)), 's;' &
-         , 'Tmax',     trim(num2lstr(CaseData%Tmax)),'s'
-      
-      write (OutFileData%unOutFile,'()' )    !print a blank line
-              
-
-      numOuts = size(OutFileData%WriteOutputHdr)
-         !......................................................
-         ! Write the names of the output parameters on one line:
-         !......................................................
-
-      call WrFileNR ( OutFileData%unOutFile, '     Time           ' )
-
-      do i=1,NumOuts
-         call WrFileNR ( OutFileData%unOutFile, OutFileData%delim//OutFileData%WriteOutputHdr(i) )
-      end do ! i
-
-      write (OutFileData%unOutFile,'()')
-
-         !......................................................
-         ! Write the units of the output parameters on one line:
-         !......................................................
-
-      call WrFileNR ( OutFileData%unOutFile, '      (s)           ' )
-
-      do i=1,NumOuts
-         call WrFileNR ( OutFileData%unOutFile, OutFileData%delim//OutFileData%WriteOutputUnt(i) )
-      end do ! i
-
-      write (OutFileData%unOutFile,'()')      
-      
-     ! Create hybrid interface output file
-      call GetNewUnit(HybUn, ErrStat, ErrMsg)
-         if ( ErrStat >= AbortErrLev ) then
-            HybUn = -1
-            return
-         end if
-
-      
-end subroutine Dvr_InitializeOutputFile
-
-end module AeroDyn_Driver_Subs
+end module AeroDyn_Model_Subs
