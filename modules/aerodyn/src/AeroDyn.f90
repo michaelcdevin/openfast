@@ -1059,11 +1059,13 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
 
    ! local variables
    type(AD_InputType)                           :: uInterp     ! Interpolated/Extrapolated input
-   logical                                      :: copy_phys   ! flag to determine whether direct measurements should be directly copied (if interpolating)
    integer(intKi)                               :: ErrStat2          ! temporary Error status
    character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
    character(*), parameter                      :: RoutineName = 'AD_UpdateStates'
       
+   real  :: hubpos(3)
+   real  :: hubori(3,3)
+   
    ErrStat = ErrID_None
    ErrMsg  = ""
      
@@ -1076,28 +1078,32 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
       end if
 
       ! set values of m%BEMT_u(2) from inputs interpolated at t+dt:
-      copy_phys = .false.
-   call AD_Input_ExtrapInterp(u,utimes,uInterp,t+p%DT, copy_phys, errStat2, errMsg2)
+   call AD_Input_ExtrapInterp(u,utimes,uInterp,t+p%DT, errStat2, errMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
    call SetInputs(p, uInterp, m, 2, errStat2, errMsg2)      
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      
+
       ! set values of m%BEMT_u(1) from inputs (uInterp) interpolated at t:
       ! I'm doing this second in case we want the other misc vars at t as before, but I don't think it matters
       ! @mcd: this call is changed so that direct measurements are copied (not interpolated) into m%BEMT_u(1) since they are exact
-      copy_phys = .true.
-   call AD_Input_ExtrapInterp(u,utimes,uInterp, t, copy_phys, errStat2, errMsg2)
+      ! @mcd: for debugging: if this keeps erroring out for debugging, try MESH_UPDATECOPY instead of MESH_NEWCOPY
+   call AD_Input_ExtrapInterp(u,utimes,uInterp, t, errStat2, errMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+
+      CALL MeshCopy( u(2)%HubMotion, uInterp%HubMotion, MESH_NEWCOPY, errStat2, errMsg2 )
+         CALL SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
+      CALL MeshCopy( u(2)%TowerMotion, uInterp%TowerMotion, MESH_NEWCOPY, errStat2, errMsg2 )
+         CALL SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
 
    call SetInputs(p, uInterp, m, 1, errStat2, errMsg2)      
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-         
                         
       ! Call into the BEMT update states    NOTE:  This is a non-standard framework interface!!!!!  GJH
    call BEMT_UpdateStates(t, n, m%BEMT_u(1), m%BEMT_u(2),  p%BEMT, x%BEMT, xd%BEMT, z%BEMT, OtherState%BEMT, p%AFI, m%BEMT, errStat2, errMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-         
            
    call Cleanup()
    
@@ -1351,8 +1357,8 @@ subroutine SetInputsForBEMT(p, u, m, indx, errStat, errMsg)
    else
      y_hat_disk = tmp / tmp_sz
      z_hat_disk = cross_product( m%V_diskAvg, x_hat_disk ) / tmp_sz
-  end if
-     
+   end if
+   
       ! "Angular velocity of rotor" rad/s
    m%BEMT_u(indx)%omega   = dot_product( u%HubMotion%RotationVel(:,1), x_hat_disk )    
    
@@ -1430,8 +1436,7 @@ subroutine SetInputsForBEMT(p, u, m, indx, errStat, errMsg)
    end do !k=blades
    
    
-      ! "Radial distance from center-of-rotation to node" m
-   
+      ! "Radial distance from center-of-rotation to node"
    do k=1,p%NumBlades
       do j=1,p%NumBlNds
          

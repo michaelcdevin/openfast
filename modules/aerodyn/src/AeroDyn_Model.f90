@@ -40,7 +40,8 @@ program AeroDyn_Model
    character(ErrMsgLen)                           :: errMsg               ! Error message if ErrStat /= ErrID_None
    
    character(1024)                                :: Phys_HubFile         ! Name of file containing current physical hub data
-   character(1024)                                :: Phys_TwrFile         ! Name of file containing current physical tower data                   
+   character(1024)                                :: Phys_TwrFile         ! Name of file containing current physical tower data
+   character(1024)                                :: Phys_OutFile         ! Name of file containing data to be sent to the physical model
    integer                                        :: OutUn                ! Unit for the output hybrid file.
    integer                                        :: HubUn                ! Unit for the input hub file
    integer                                        :: TwrUn                ! Unit for the input tower file
@@ -55,12 +56,12 @@ program AeroDyn_Model
    !real(DbKi)                                     :: SttsTime                                ! Amount of time between screen status messages (sec)
    !integer                                        :: n_SttsTime                              ! Number of time steps between screen status messages (-)
    logical                                        :: AD_Initialized
-   
                             
 
    errStat     = ErrID_None
    errMsg      = ''
    AD_Initialized = .false.
+   Phys_OutFile = 'C:\Users\devin\OneDrive\Documents\College\Research\Code\Fake Wind\OpenFAST source code\num_mod_outputs.out' ! @mcd: make this more general later
    
    time        = 0.0 ! seconds
       
@@ -104,28 +105,40 @@ program AeroDyn_Model
             ErrMsg = 'AeroDyn changed the time step for case '//trim(num2lstr(iCase))//'. Change DTAero to "default".'
             call CheckError()
          end if
-                                    
-        ! @mcd: Get units for hybrid interface files
-      call GetNewUnit(HubUn) ! hub input file
-      call GetNewUnit(TwrUn) ! tower input file
-      call GetNewUnit(OutUn) ! force output file
       
-      call Dvr_InitializeOutputFiles( iCase, DvrData%Cases(iCase), DvrData%OutFileData, errStat, errMsg)
+      call Dvr_InitializeOutputFile( iCase, DvrData%Cases(iCase), DvrData%OutFileData, errStat, errMsg)
          call CheckError()
       
       
       do nt = 1, numSteps
           
           ! Open hybrid interface files
-          call OpenFInpFile(HubUn, Phys_HubFile, ErrStat, ErrMsg )
-             call CheckError()
-          call OpenFInpFile(TwrUn, Phys_TwrFile, ErrStat, ErrMsg)
-             call CheckError()
-          call OpenFOutFile (OutUn, 'num_mod_outputs.out', ErrStat, ErrMsg )
-             call CheckError()
-            
+        call GetNewUnit(HubUn) ! hub input file
+            open (HubUn, file=Phys_HubFile, status='OLD', action='READWRITE', iostat=errStat)
+                if (errStat .ne. 0) then
+                    do while (errStat .ne. 0)
+                        call sleepqq(1)
+                        open(HubUn, file=Phys_HubFile, status='OLD', action='READWRITE', iostat=errStat)
+                    end do
+                end if
+        call GetNewUnit(TwrUn) ! tower input file
+            open (TwrUn, file=Phys_TwrFile, status='OLD', action='READWRITE', iostat=errStat)
+                if (errStat .ne. 0) then
+                    do while (errStat .ne. 0)
+                        call sleepqq(1)
+                        open(TwrUn, file=Phys_TwrFile, status='OLD', action='READWRITE', iostat=errStat)
+                    end do
+                end if
+        call GetNewUnit(OutUn) ! force output file
+            open (OutUn, file=Phys_OutFile, status='NEW', action='WRITE', iostat=errStat)
+                if (errStat .ne. 0) then
+                    do while (errStat .ne. 0)
+                        call sleepqq(1)
+                        open(OutUn, file=Phys_OutFile, status='NEW', action='WRITE', iostat=errStat)
+                    end do
+                end if
          
-         ! Get current motion information from physical model
+         ! Get current motion information from physical model (physical model input files are deleted at the end of this routine)
           call PhysMod_Get_Physical_Motions(PhysData, HubUn, TwrUn)
           
          !...............................
@@ -136,26 +149,22 @@ program AeroDyn_Model
             call CheckError()
    
          time = AD%InputTime(2)
-            
+
             ! Calculate outputs at nt - 1
 
          call AD_CalcOutput( time, AD%u(2), AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%y, AD%m, errStat, errMsg )
             call CheckError()
-   
+
             ! @mcd: this is modified to write output to both normal output file and hybrid interface file
          call Dvr_WriteOutputLine(DvrData%OutFileData, time, AD%y%WriteOutput, OutUn, errStat, errMsg)
             call CheckError()
             
-            
             ! Get state variables at next step: INPUT at step nt - 1, OUTPUT at step nt
          call AD_UpdateStates( time, nt-1, AD%u, AD%InputTime, AD%p, AD%x, AD%xd, AD%z, AD%OtherState, AD%m, errStat, errMsg )
             call CheckError()
-      
                   
-            ! Close and delete current hybrid interface files
-            close(HubUn, STATUS='DELETE')
-            close(TwrUn, STATUS='DELETE')
-            close(OutUn, STATUS='DELETE')
+            ! Close and delete current hybrid output file
+            close(OutUn, status='DELETE')
             
       end do !nt=1,numSteps
       

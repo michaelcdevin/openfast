@@ -118,7 +118,6 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, Phys_HubFile, Phys_Twr
    type(AD_InitOutputType)                       :: InitOutData    ! Output data from initialization
       
       
-      
    errStat = ErrID_None
    errMsg  = ''
    
@@ -138,7 +137,7 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, Phys_HubFile, Phys_Twr
       return
    end if
       
-   InitInData%HubPosition = 0.0_ReKi ! @mcd: initialize at zero, but change after receiving physical model measurement
+   InitInData%HubPosition = (/ DvrData%Overhang * cos(DvrData%shftTilt), 0.0_ReKi, DvrData%HubHt /)
    theta(1) = 0.0_ReKi
    theta(2) = -DvrData%shftTilt
    theta(3) = 0.0_ReKi
@@ -184,15 +183,13 @@ subroutine Init_AeroDyn(iCase, DvrData, AD, PhysData, dt, Phys_HubFile, Phys_Twr
    end if
    
       ! we know exact values, so we're going to initialize inputs this way (instead of using the input guesses from AD_Init)
+      ! @mcd: since this is just setting up the framework/initial extrapolation for the inputs, just do normal Set_AD_Inputs instead of the modified versions.
+      ! (the physical motions for the first time step will be read in during the time marching scheme)
    AD%InputTime = -999
    DO j = 1-numInp, 0
-      ! call PhysMod_Get_Physical_Motions(PhysData, MediumDir) ! @mcd: I don't think I need to do this for interpolation? It's just setting up the framework I think.
-      call Set_AD_Motion_Inputs_NoIfW(iCase,j,DvrData,AD,PhysData,errStat,errMsg)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      call Set_AD_Inflows(iCase,j,DvrData,AD,errStat,errMsg)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        call Set_AD_Inputs(iCase,j,DvrData,AD,errStat2,errMsg2)
+            call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    END DO              
-   
       
       ! move AD initOut data to AD Driver
    call move_alloc( InitOutData%WriteOutputHdr, DvrData%OutFileData%WriteOutputHdr )
@@ -220,7 +217,7 @@ subroutine PhysMod_Init(p, InitInp, InitOut, PhysData, ErrStat, ErrMsg)
 
     ! Local variables
     integer                                   :: j, k               ! loop variables
-    real(reKi)                                :: position(3)        ! node reference position
+    real(ReKi)                                :: position(3)        ! node reference position
     integer(intKi)                            :: ErrStat2           ! Temporary error status
     character(ErrMsgLen)                      :: ErrMsg2            ! Temporary error message
     character(*), parameter                   :: RoutineName = 'PhysMod_Init'
@@ -305,7 +302,7 @@ subroutine PhysMod_Init(p, InitInp, InitOut, PhysData, ErrStat, ErrMsg)
 
          
     PhysData%HubMotion%Orientation     = PhysData%HubMotion%RefOrientation
-    PhysData%HubMotion%TranslationDisp = 0.0_ReKi ! @mcd: originally was 0.0_R8Ki, but changed it to match what Set_AD_Inputs initially sets. Keep in mind for debugging.
+    PhysData%HubMotion%TranslationDisp = 0.0_R8Ki ! @mcd: originally was 0.0_R8Ki, but changed it to match what Set_AD_Inputs initially sets. Keep in mind for debugging.
     PhysData%HubMotion%RotationVel     = 0.0_ReKi
     
     end subroutine PhysMod_Init
@@ -315,35 +312,168 @@ subroutine PhysMod_Get_Physical_Motions(PhysData, HubUn, TwrUn)
    type(AD_InputType)          , intent(inout) :: PhysData      ! Physical model data
    integer                     , intent(in   ) :: HubUn         ! Unit for the input hub file
    integer                     , intent(in   ) :: TwrUn         ! Unit for the input tower file
-   
    ! local variables
    character(*), parameter                     :: RoutineName = 'PhysMod_Get_Physical_Motions'
    integer                                     :: j, k
    
    ! Map data to AeroDyn-readable type
    ! The hub data is in format Position(1x3), Orientation(3x3), TranslationDisp(1x3), RotationVel(1x3)
+!   file_available = access(Phys_HubFile, 'w') ! check to make sure hub file is available
+!   do while (file_available .ne. 0)
+!       file_available = access(Phys_HubFile, 'w')
+!   end do
    read(HubUn, *) PhysData%HubMotion%Position(:,1)
    do j = 1, 3
-       read(HubUn1, *) PhysData%HubMotion%Orientation(:,j,1)
+       read(HubUn, *) PhysData%HubMotion%Orientation(:,j,1)
    end do
-   read(HubUn, *) PhysData%HubMotion%TranslationDisp(:,1)
-   read(HubUn, *) PhysData%HubMotion%RotationVel(:,1)
-   close(HubUn)
+   close(HubUn, status='DELETE')
    
    ! @mcd: I'm doing this by tower node for now, but I doubt we will have enough sensors to analyze many point along the tower, so this will almost certainly change.
    !       Not to mention the eventual partial integration with ElastoDyn.
    ! The tower data is in format Position(1x3), Orientation(3x3), TranslationDisp(1x3), TranslationVel(1x3), working node by node
+!   file_available = access(Phys_TwrFile, 'w') ! check to make sure hub file is available
+!   do while (file_available .ne. 0)
+!       file_available = access(Phys_TwrFile, 'w')
+!   end do
    do j = 1, PhysData%TowerMotion%NNodes
        read(TwrUn, *) PhysData%TowerMotion%Position(:,j)
        do k = 1, 3
            read(TwrUn, *) PhysData%TowerMotion%Orientation(:,k,j)
        end do
-       read(TwrUn, *) PhysData%TowerMotion%TranslationDisp(:,j)
-       read(TwrUn, *) PhysData%TowerMotion%TranslationVel(:,j)
    end do
-   close(TwrUn)
+   close(TwrUn, status='DELETE')
    
    end subroutine PhysMod_Get_Physical_Motions
+!----------------------------------------------------------------------------------------------------------------------------------
+!> this routine returns time=(nt-1) * DvrData%Cases(iCase)%dT, and cycles values in the input array AD%InputTime and AD%u.
+!! it then sets the inputs for nt * DvrData%Cases(iCase)%dT, which are index values 1 in the arrays.
+subroutine Set_AD_Inputs(iCase,nt,DvrData,AD,errStat,errMsg)
+
+   integer(IntKi)              , intent(in   ) :: iCase         ! case number 
+   integer(IntKi)              , intent(in   ) :: nt            ! time step number
+   
+   type(Dvr_SimData),            intent(inout) :: DvrData       ! Driver data 
+   type(AeroDyn_Data),           intent(inout) :: AD            ! AeroDyn data 
+   integer(IntKi)              , intent(  out) :: errStat       ! Status of error message
+   character(*)                , intent(  out) :: errMsg        ! Error message if ErrStat /= ErrID_None
+
+      ! local variables
+   integer(IntKi)                              :: errStat2      ! local status of error message
+   character(ErrMsgLen)                        :: errMsg2       ! local error message if ErrStat /= ErrID_None
+   character(*), parameter                     :: RoutineName = 'Set_AD_Inputs'
+
+   integer(intKi)                              :: j             ! loop counter for nodes
+   integer(intKi)                              :: k             ! loop counter for blades
+
+   real(ReKi)                                  :: z             ! height (m)
+   !real(ReKi)                                  :: angle
+   real(R8Ki)                                  :: theta(3)
+   real(R8Ki)                                  :: position(3)
+   real(R8Ki)                                  :: orientation(3,3)
+   real(R8Ki)                                  :: rotateMat(3,3)
+   
+   
+   errStat = ErrID_None
+   errMsg  = ""
+   
+      ! note that this initialization is a little different than the general algorithm in FAST because here
+      ! we can get exact values, so we are going to ignore initial guesses and not extrapolate
+      
+   !................
+   ! shift previous calculations:
+   !................
+   do j = numInp-1,1,-1
+      call AD_CopyInput (AD%u(j),  AD%u(j+1),  MESH_UPDATECOPY, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+            
+      AD%InputTime(j+1) = AD%InputTime(j)
+   end do
+   AD%inputTime(1) = nt * DvrData%Cases(iCase)%dT
+         
+   !................
+   ! calculate new values
+   !................
+   
+      ! Tower motions:
+      do j=1,AD%u(1)%TowerMotion%nnodes
+         AD%u(1)%TowerMotion%Orientation(  :,:,j) = AD%u(1)%TowerMotion%RefOrientation(:,:,j) ! identity
+         AD%u(1)%TowerMotion%TranslationDisp(:,j) = 0.0_ReKi
+         AD%u(1)%TowerMotion%TranslationVel( :,j) = 0.0_ReKi
+      end do !j=nnodes
+      
+      ! Hub motions:
+      theta(1) = 0.0_ReKi
+      theta(2) = 0.0_ReKi
+      theta(3) = DvrData%Cases(iCase)%Yaw
+      orientation = EulerConstruct(theta)
+            
+      AD%u(1)%HubMotion%TranslationDisp(:,1) = matmul( AD%u(1)%HubMotion%Position(:,1), orientation ) - AD%u(1)%HubMotion%Position(:,1) ! = matmul( transpose(orientation) - eye(3), AD%u(1)%HubMotion%Position(:,1) )
+      
+      theta(1) = AD%inputTime(1) * DvrData%Cases(iCase)%RotSpeed
+      theta(2) = 0.0_ReKi
+      theta(3) = 0.0_ReKi
+      AD%u(1)%HubMotion%Orientation(  :,:,1) = matmul( AD%u(1)%HubMotion%RefOrientation(:,:,1), orientation )
+      orientation = EulerConstruct( theta )      
+      AD%u(1)%HubMotion%Orientation(  :,:,1) = matmul( orientation, AD%u(1)%HubMotion%Orientation(  :,:,1) )
+      
+      AD%u(1)%HubMotion%RotationVel(    :,1) = AD%u(1)%HubMotion%Orientation(1,:,1) * DvrData%Cases(iCase)%RotSpeed
+                  
+      ! Blade root motions:
+      do k=1,DvrData%numBlades         
+         theta(1) = (k-1)*TwoPi/real(DvrData%numBlades,ReKi)
+         theta(2) =  DvrData%precone
+         theta(3) = -DvrData%Cases(iCase)%pitch
+         orientation = EulerConstruct(theta)
+         
+         AD%u(1)%BladeRootMotion(k)%Orientation(  :,:,1) = matmul( orientation, AD%u(1)%HubMotion%Orientation(  :,:,1) )
+         
+      end do !k=numBlades
+            
+      ! Blade motions:
+      do k=1,DvrData%numBlades
+         rotateMat = transpose( AD%u(1)%BladeRootMotion(k)%Orientation(  :,:,1) )
+         rotateMat = matmul( rotateMat, AD%u(1)%BladeRootMotion(k)%RefOrientation(  :,:,1) ) 
+         orientation = transpose(rotateMat)
+         
+         rotateMat(1,1) = rotateMat(1,1) - 1.0_ReKi
+         rotateMat(2,2) = rotateMat(2,2) - 1.0_ReKi
+         rotateMat(3,3) = rotateMat(3,3) - 1.0_ReKi
+                  
+         do j=1,AD%u(1)%BladeMotion(k)%nnodes        
+            position = AD%u(1)%BladeMotion(k)%Position(:,j) - AD%u(1)%HubMotion%Position(:,1) 
+            AD%u(1)%BladeMotion(k)%TranslationDisp(:,j) = AD%u(1)%HubMotion%TranslationDisp(:,1) + matmul( rotateMat, position )
+            
+            AD%u(1)%BladeMotion(k)%Orientation(  :,:,j) = matmul( AD%u(1)%BladeMotion(k)%RefOrientation(:,:,j), orientation )
+            
+            
+            position =  AD%u(1)%BladeMotion(k)%Position(:,j) + AD%u(1)%BladeMotion(k)%TranslationDisp(:,j) &
+                      - AD%u(1)%HubMotion%Position(:,1) - AD%u(1)%HubMotion%TranslationDisp(:,1)
+            AD%u(1)%BladeMotion(k)%TranslationVel( :,j) = cross_product( AD%u(1)%HubMotion%RotationVel(:,1), position )
+
+         end do !j=nnodes
+                                    
+      end do !k=numBlades       
+      
+      ! Inflow wind velocities:
+      ! InflowOnBlade
+      do k=1,DvrData%numBlades
+         do j=1,AD%u(1)%BladeMotion(k)%nnodes
+            z = AD%u(1)%BladeMotion(k)%Position(3,j) + AD%u(1)%BladeMotion(k)%TranslationDisp(3,j)
+            AD%u(1)%InflowOnBlade(1,j,k) = GetU(  DvrData%Cases(iCase)%WndSpeed, DvrData%HubHt, DvrData%Cases(iCase)%ShearExp, z )
+            AD%u(1)%InflowOnBlade(2,j,k) = 0.0_ReKi !V
+            AD%u(1)%InflowOnBlade(3,j,k) = 0.0_ReKi !W      
+         end do !j=nnodes
+      end do !k=numBlades
+      
+      !InflowOnTower
+      do j=1,AD%u(1)%TowerMotion%nnodes
+         z = AD%u(1)%TowerMotion%Position(3,j) + AD%u(1)%TowerMotion%TranslationDisp(3,j)
+         AD%u(1)%InflowOnTower(1,j) = GetU(  DvrData%Cases(iCase)%WndSpeed, DvrData%HubHt, DvrData%Cases(iCase)%ShearExp, z )
+         AD%u(1)%InflowOnTower(2,j) = 0.0_ReKi !V
+         AD%u(1)%InflowOnTower(3,j) = 0.0_ReKi !W         
+      end do !j=nnodes
+                     
+end subroutine Set_AD_Inputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine cycles InputTime values and sets all the AeroDyn motion inputs (no wind inflow values).
 !!  For the time being, wind inflows are handled by Set_AD_Inflows.
@@ -370,7 +500,7 @@ subroutine Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMs
    real(R8Ki)                                  :: position(3)
    real(R8Ki)                                  :: orientation(3,3)
    real(R8Ki)                                  :: rotateMat(3,3)
-
+   
    
    ! note that this initialization is a little different than the general algorithm in FAST because here
    ! we can get exact values, so we are going to ignore initial guesses and not extrapolate
@@ -396,8 +526,6 @@ subroutine Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMs
       do j=1,AD%u(1)%TowerMotion%nnodes
          AD%u(1)%TowerMotion%Position(       :,j) = PhysData%TowerMotion%Position(:,j)
          AD%u(1)%TowerMotion%Orientation(  :,:,j) = PhysData%TowerMotion%Orientation(:,:,j)  ! this will likely need to be updated at some point, since the physical model orientation may not capture yaw well.
-         AD%u(1)%TowerMotion%TranslationDisp(:,j) = PhysData%TowerMotion%TranslationDisp(:,j)
-         AD%u(1)%TowerMotion%TranslationVel( :,j) = PhysData%TowerMotion%TranslationVel(:,j)
       end do !j=nnodes
       
       ! Hub motions:
@@ -406,7 +534,9 @@ subroutine Set_AD_Motion_Inputs_NoIfW(iCase,nt,DvrData,AD,PhysData,errStat,errMs
       theta(2) = 0.0_ReKi
       theta(3) = DvrData%Cases(iCase)%Yaw
       orientation = EulerConstruct(theta)
+
       AD%u(1)%HubMotion%Position(:,1) = PhysData%HubMotion%Position(:,1)
+      AD%u(1)%HubMotion%Orientation(:,:,1) = PhysData%HubMotion%Orientation(:,:,1)
       AD%u(1)%HubMotion%TranslationDisp(:,1) = matmul(AD%u(1)%HubMotion%Position(:,1), orientation) - AD%u(1)%HubMotion%Position(:,1)    
       
       theta(1) = AD%inputTime(1) * DvrData%Cases(iCase)%RotSpeed ! this will need to be updated once ServoDyn is incorporated
@@ -479,6 +609,7 @@ subroutine Set_AD_Inflows(iCase,nt,DvrData,AD,errStat,errMsg)
    integer(intKi)                              :: k             ! loop counter for blades
 
    real(ReKi)                                  :: z             ! height (m)
+   real                                     :: x1,x2
    real(R8Ki)                                  :: theta(3)
    real(R8Ki)                                  :: position(3)
    real(R8Ki)                                  :: orientation(3,3)
@@ -494,6 +625,8 @@ subroutine Set_AD_Inflows(iCase,nt,DvrData,AD,errStat,errMsg)
       do k=1,DvrData%numBlades
          do j=1,AD%u(1)%BladeMotion(k)%nnodes
             z = AD%u(1)%BladeMotion(k)%Position(3,j) + AD%u(1)%BladeMotion(k)%TranslationDisp(3,j)
+            x1 = AD%u(1)%BladeMotion(k)%Position(3,j)
+            x2 = AD%u(1)%BladeMotion(k)%TranslationDisp(3,j)
             AD%u(1)%InflowOnBlade(1,j,k) = GetU(  DvrData%Cases(iCase)%WndSpeed, DvrData%HubHt, DvrData%Cases(iCase)%ShearExp, z )
             AD%u(1)%InflowOnBlade(2,j,k) = 0.0_ReKi !V
             AD%u(1)%InflowOnBlade(3,j,k) = 0.0_ReKi !W      
@@ -548,6 +681,7 @@ subroutine Dvr_ReadInputFile(fileName, DvrData, errStat, errMsg )
    INTEGER(IntKi)               :: ErrStat2                                 ! Temporary Error status
    CHARACTER(ErrMsgLen)         :: ErrMsg2                                  ! Temporary Err msg
    CHARACTER(*), PARAMETER      :: RoutineName = 'Dvr_ReadInputFile'
+   
    
    
    ErrStat = ErrID_None
@@ -621,6 +755,7 @@ subroutine Dvr_ReadInputFile(fileName, DvrData, errStat, errMsg )
       end if
    IF ( PathIsRelative( DvrData%AD_InputFile ) ) DvrData%AD_InputFile = TRIM(PriPath)//TRIM(DvrData%AD_InputFile)
 
+   ! @mcd: Added in physical model output file locations.
    call ReadVar ( unIn, fileName, DvrData%Phys_HubFile,   'Phys_HubFile',   'Name of file containing current physical hub data', errStat2, errMsg2, UnEc )
       call setErrStat( errStat2, ErrMsg2 , errStat, ErrMsg , RoutineName )
       if ( errStat >= AbortErrLev ) then
