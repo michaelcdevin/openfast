@@ -318,28 +318,26 @@ subroutine PhysMod_Get_Physical_Motions(PhysData, HubUn, TwrUn)
    
    ! Map data to AeroDyn-readable type
    ! The hub data is in format Position(1x3), Orientation(3x3), TranslationDisp(1x3), RotationVel(1x3)
-!   file_available = access(Phys_HubFile, 'w') ! check to make sure hub file is available
-!   do while (file_available .ne. 0)
-!       file_available = access(Phys_HubFile, 'w')
-!   end do
+
    read(HubUn, *) PhysData%HubMotion%Position(:,1)
    do j = 1, 3
        read(HubUn, *) PhysData%HubMotion%Orientation(:,j,1)
    end do
+   read(HubUn, *) PhysData%HubMotion%TranslationDisp(:,1)
+   read(HubUn, *) PhysData%HubMotion%RotationVel(:,1)
    close(HubUn, status='DELETE')
    
    ! @mcd: I'm doing this by tower node for now, but I doubt we will have enough sensors to analyze many point along the tower, so this will almost certainly change.
    !       Not to mention the eventual partial integration with ElastoDyn.
    ! The tower data is in format Position(1x3), Orientation(3x3), TranslationDisp(1x3), TranslationVel(1x3), working node by node
-!   file_available = access(Phys_TwrFile, 'w') ! check to make sure hub file is available
-!   do while (file_available .ne. 0)
-!       file_available = access(Phys_TwrFile, 'w')
-!   end do
+
    do j = 1, PhysData%TowerMotion%NNodes
        read(TwrUn, *) PhysData%TowerMotion%Position(:,j)
        do k = 1, 3
            read(TwrUn, *) PhysData%TowerMotion%Orientation(:,k,j)
        end do
+       read(TwrUn, *) PhysData%TowerMotion%TranslationDisp(:,j)
+       read(TwrUn, *) PhysData%TowerMotion%TranslationVel(:,j)
    end do
    close(TwrUn, status='DELETE')
    
