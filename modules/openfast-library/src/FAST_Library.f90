@@ -319,6 +319,9 @@ subroutine FAST_SetExternalInputs(iTurb, NumInputs_c, InputAry, m_FAST)
    REAL(C_DOUBLE),         INTENT(IN   ) :: InputAry(NumInputs_c)                   ! Inputs from Simulink
    TYPE(FAST_MiscVarType), INTENT(INOUT) :: m_FAST                                  ! Miscellaneous variables
    
+   INTEGER  :: num_twr_nodes
+   INTEGER  :: j, k
+   
          ! set the inputs from external code here...
          ! transfer inputs from Simulink to FAST
       IF ( NumInputs_c < NumFixedInputs ) RETURN ! This is an error
@@ -331,9 +334,21 @@ subroutine FAST_SetExternalInputs(iTurb, NumInputs_c, InputAry, m_FAST)
       m_FAST%ExternInput%HSSBrFrac   = InputAry(8)         
             
       IF ( NumInputs_c > NumFixedInputs ) THEN  ! NumFixedInputs is the fixed number of inputs
-         IF ( NumInputs_c == NumFixedInputs + 3 ) &
+         IF ( NumInputs_c == NumFixedInputs + 3 ) & ! InflowWind integration
              m_FAST%ExternInput%LidarFocus = InputAry(9:11)
-      END IF   
+         IF ( NumInputs_c == NumFixedInputs + 378) & ! AeroDyn integration
+             m_FAST%ExternInput%HubMotion%Position = InputAry(9:11)
+             m_FAST%ExternInput%HubMotion%Orientation = RESHAPE(InputAry(12:20), [3,3])
+             m_FAST%ExternInput%HubMotion%TranslationDisp = InputAry(21:23)
+             m_FAST%ExternInput%HubMotion%RotationVel = InputAry(24:26)
+             DO j = 1, num_twr_nodes
+                k = 27 * j
+                m_FAST%ExternInput%TowerMotion%Position(:,j) = InputAry(k:k+2)
+                m_FAST%ExternInput%TowerMotion%Orientation(:,:,j) = RESHAPE(InputAry(k+3:k+11), [3,3])
+                m_FAST%ExternInput%TowerMotion%TranslationDisp(:,j) = InputAry(k+12:k+14)
+                m_FAST%ExternInput%TowerMotion%TranslationVel(:,j) = InputAry(k+15:k+17)
+             END DO
+        END IF
       
 end subroutine FAST_SetExternalInputs
 !==================================================================================================================================
