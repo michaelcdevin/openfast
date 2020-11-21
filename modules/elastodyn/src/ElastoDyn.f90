@@ -1729,7 +1729,8 @@ END IF
    y%BlPitch  = u%BlPitchCom !OtherState%BlPitch
    y%LSS_Spd  = x%QDT(DOF_GeAz)
    y%HSS_Spd  = ABS(p%GBRatio)*x%QDT(DOF_GeAz)
-   y%RotSpeed = x%QDT(DOF_GeAz) + x%QDT(DOF_DrTr)
+   y%
+   = x%QDT(DOF_GeAz) + x%QDT(DOF_DrTr)
    
    IF ( t > 0.0_DbKi  )  THEN
 

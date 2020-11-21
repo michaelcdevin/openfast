@@ -357,6 +357,34 @@ SUBROUTINE IfW_SetExternalInputs( p_IfW, m_FAST, y_ED, u_IfW )
 
 END SUBROUTINE IfW_SetExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
+!> This routine sets the inputs required for AeroDyn from an external source (Simulink)
+SUBROUTINE AD_SetExternalInputs( p_FAST, m_FAST, u_AD, MeshMapData, ErrStat, ErrMsg )
+!..................................................................................................................................
+   
+   TYPE(FAST_ParameterType),         INTENT(IN)     :: p_FAST       !< Glue-code simulation parameters
+   TYPE(FAST_MiscVarType),           INTENT(IN)     :: m_FAST       !< Glue-code misc variables (including inputs from external sources like Simulink)
+   TYPE(AD_InputType),               INTENT(INOUT)  :: u_AD         !< AeroDyn inputs at t
+   TYPE(FAST_ModuleMapType),         INTENT(INOUT)  :: MeshMapData  !< Data for mapping between modules
+   
+   INTEGER(IntKi)                                   :: ErrStat      !< Error status of the operation
+   CHARACTER(*)                                     :: ErrMsg       !< Error message if ErrStat /= ErrID_None
+
+      ! local variables
+   INTEGER(IntKi)                                   :: ErrStat2      ! Error status of the operation
+   CHARACTER(*)                                     :: ErrMsg2       ! Error message if ErrStat /= ErrID_None
+   
+     m_FAST%ExternInput%HubMotion%Position 
+
+      ! tower
+   CALL Transfer_Line2_to_Line2( m_FAST%ExternInput%TowerMotion, u_AD%TowerMotion, MeshMapData%ED_L_2_AD_L_T, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%TowerMotion' )      
+      
+      ! hub
+   CALL Transfer_Point_to_Point( m_FAST%ExternInput%HubMotion, u_AD%HubMotion, MeshMapData%ED_P_2_AD_P_H, ErrStat2, ErrMsg2 )
+      CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%HubMotion' ) 
+      
+END SUBROUTINE AD_SetExternalInputs
+!----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the AeroDyn wind inflow inputs.
 SUBROUTINE AD_InputSolve_IfW( p_FAST, u_AD, y_IfW, y_OpFM, ErrStat, ErrMsg )
 

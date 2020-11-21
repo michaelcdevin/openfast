@@ -1219,7 +1219,17 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
    end if
    
    m_FAST%ExternInput%LidarFocus = 1.0_ReKi  ! make this non-zero (until we add the initial position in the InflowWind input file)
-         
+   
+   m_FAST%ExternInput%HubMotion%Position(:,1) = ED%Output(1)%HubPtMotion%Position(:,1)
+   m_FAST%ExternInput%HubMotion%Orientation(:,:,1) = ED%Output(1)%HubPtMotion%RefOrientation(:,:,1)
+   m_FAST%ExternInput%HubMotion%TranslationDisp(:,1) = 0.0_ReKi ! @mcd: not sure if this is right... AD uses matmul( transpose(orientation) - eye(3), AD%u(1)%HubMotion%Position(:,1) )
+   m_FAST%ExternInput%HubMotion%RotationVel(:,1) = m_FAST%ExternInput%HubMotion%Orientation(1,:,1) * ED%p%RotSpeed
+   do j=1,AD%Input(1)%TowerMotion%NNodes
+         m_FAST%ExternInput%TowerMotion%Position(:, j) = 0.0_ReKi
+         m_FAST%ExternInput%TowerMotion%Orientation(:,:, j) = AD%Input(1)%TowerMotion%RefOrientation(:,:,j)
+         m_FAST%ExternInput%TowerMotion%TranslationDisp(:, j) = 0.0_ReKi
+         m_FAST%ExternInput%TowerMotion%TranslationVel(:, j) = 0.0_ReKi
+   end do !j=nnodes
    
    !...............................................................................................................................
    ! Destroy initializion data
@@ -3785,6 +3795,7 @@ SUBROUTINE FAST_Solution0(p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, O
       ! the initial ServoDyn and IfW/Lidar inputs from Simulink:
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )   
    IF ( p_FAST%CompInflow == Module_IfW ) CALL IfW_SetExternalInputs( IfW%p, m_FAST, ED%Output(1), IfW%Input(1) )  
+   IF ( p_FAST%CompAero == Module_AD) CALL AD_SetExternalInputs(p_FAST, m_FAST, AD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
 
    CALL CalcOutputs_And_SolveForInputs(  n_t_global, m_FAST%t_global,  STATE_CURR, m_FAST%calcJacobian, m_FAST%NextJacCalcTime, &
                         p_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, &
