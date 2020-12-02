@@ -42,11 +42,14 @@ MODULE ElastoDyn
 
    PUBLIC :: ED_UpdateStates                   ! Loose coupling routine for solving for constraint states, integrating
                                                !   continuous states, and updating discrete states
+   PUBLIC :: ED_Disp_UpdateStates              ! Routine to transfer displacement inputs from an external source (Simulink)
+                                               !   to the continuous states to be updated via the normal loose coupling routine
+   PUBLIC :: ED_FormatDispInputs               ! Routine to separate external displacements from the inputs
    PUBLIC :: ED_CalcOutput                     ! Routine for computing outputs
 
    PUBLIC :: ED_CalcConstrStateResidual        ! Tight coupling routine for returning the constraint state residual
    PUBLIC :: ED_CalcContStateDeriv             ! Tight coupling routine for computing derivatives of continuous states
-   PUBLIC :: ED_UpdateDiscState                ! Tight coupling routine for updating discrete states
+   PUBLIC :: ED_Disc_UpdateStates              ! Tight coupling routine for updating discrete states
 
    PUBLIC :: ED_JacobianPInput                 ! Routine to compute the Jacobians of the output (Y), continuous- (X), discrete-
                                                !   (Xd), and constraint-state (Z) equations all with respect to the inputs (u)
@@ -452,6 +455,91 @@ SUBROUTINE ED_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat
             
       
 END SUBROUTINE ED_UpdateStates
+!----------------------------------------------------------------------------------------------------------------------------------
+!> Routine to transfer displacement inputs from an external source (Simulink) to the continuous states to be updated via the normal
+!! loose coupling routine (ED_UpdateStates). This is called as to not directly write inputs to continuous states, as I believe
+!! this breaks the FAST framework.
+SUBROUTINE ED_Disp_UpdateStates( u, p, x, ErrStat, ErrMsg )
+!..................................................................................................................................
+
+      TYPE(ED_InputType),                 INTENT(IN   ) :: u          !< Inputs
+      TYPE(ED_ParameterType),             INTENT(IN   ) :: p          !< Parameters
+      TYPE(ED_ContinuousStateType),       INTENT(INOUT) :: x          !< Continuous states
+      INTEGER(IntKi),                     INTENT(  OUT) :: ErrStat    !< Error status of the operation
+      CHARACTER(*),                       INTENT(  OUT) :: ErrMsg     !< Error message if ErrStat /= ErrID_None
+
+            ! Local variables:
+      REAL(ReKi)         :: PtfmDisplacement(6)  !< Six DOFs of platform displacement (in order: surge, sway, heave, pitch, roll, yaw)
+      REAL(ReKi)         :: TTDisplacement(2)    !< Two DOFs of tower top displacement (in order: fore-aft, side-side)
+      
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMsg  = ""     
+      
+         ! Extract and format displacement values from external inputs (Simulink)
+      ED_FormatDispInputs( u, PtfmDisplacement, TTDisplacement )
+      
+         ! Apply displacement values to continuous state variables if DOFs are enabled
+      IF ( p%DOF_Flag(DOF_Sg) )  THEN
+          x%QT( DOF_Sg ) = PtfmDisp(1)      ! Platform surge
+      ENDIF
+      
+      IF ( p%DOF_Flag(DOF_Sw) )  THEN
+          x%QT( DOF_Sw ) = PtfmDisp(2)      ! Platform sway
+      ENDIF
+      
+      IF ( p%DOF_Flag(DOF_Hv) )  THEN
+          x%QT( DOF_Hv ) = PtfmDisp(3)      ! Platform heave
+      ENDIF
+      
+      IF ( p%DOF_Flag(DOF_P) )  THEN
+          x%QT( DOF_P ) = PtfmDisp(4)       ! Platform pitch
+      ENDIF
+      
+      IF ( p%DOF_Flag(DOF_R) )  THEN
+          x%QT( DOF_R ) = PtfmDisp(5)       ! Platform roll
+      ENDIF
+      
+      IF ( p%DOF_Flag(DOF_Y) )  THEN
+          x%QT( DOF_Y ) = PtfmDisp(6)       ! Platform yaw
+      ENDIF
+      
+      IF ( p%DOF_Flag(DOF_TFA1) )  THEN     ! First fore-aft tower mode is enabled.
+        x%QT(DOF_TFA1) =  TTDisplacement(1)
+      ELSEIF( p%DOF_Flag(DOF_TFA2) )  THEN  ! Second fore-aft tower mode is enabled, but first is not.
+        x%QT(DOF_TFA2) =  TTDisplacement(1)
+      ENDIF
+
+      IF ( p%DOF_Flag(DOF_TSS1 )  THEN      ! First side-to-side tower mode is enabled.
+        x%QT(DOF_TSS1) = -TTDisplacement(2)
+      ELSEIF( p%DOF_Flag(DOF_TSS2) )  THEN  ! Second side-to-side tower mode is enabled, but first is not.
+        x%QT(DOF_TSS2) = -TTDisplacement(2)
+      ENDIF
+
+END SUBROUTINE ED_Disp_UpdateStates
+!----------------------------------------------------------------------------------------------------------------------------------
+!> Routine for extracting and formatting displacement inputs from an external source (Simulink)
+SUBROUTINE ED_FormatDispInputs( u, PtfmDisplacement, TTDisplacement)
+!..................................................................................................................................
+    
+      REAL(ED_InputType),              INTENT(IN   ) :: u                    !< Inputs at t
+      REAL(ReKi),                      INTENT(  OUT) :: PtfmDisplacement(6)  !< Six DOFs of platform displacement
+                                                                             !!   in order: surge, sway, heave, pitch, roll, yaw
+      REAL(ReKi),                      INTENT(  OUT) :: TTDisplacement(2)    !< Two DOFs of tower top displacment
+                                                                             !!   in order: fore-aft, side-side
+      
+      PtfmDisplacement(1)   = u%ExternalPtfmSurge
+      PtfmDisplacement(2)   = u%ExternalPtfmSway
+      PtfmDisplacement(3)   = u%ExternalPtfmHeave
+      PtfmDisplacement(4)   = u%ExternalPtfmPitch
+      PtfmDisplacement(5)   = u%ExternalPtfmRoll
+      PtfmDisplacement(6)   = u%ExternalPtfmYaw
+      
+      TTDisplacement(1)     = u%ExternalTTDspFA
+      TTDisplacement(2)     = u%ExternalTTDspSS
+      
+END SUBROUTINE ED_FormatDispInputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine for computing outputs, used in both loose and tight coupling.
 !! This SUBROUTINE is used to compute the output channels (motions and loads) and place them in the WriteOutput() array.
@@ -9091,6 +9179,19 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
       ! was allocated above to call SetCoordSy and CalculatePositions with undisplaced values
    u%BlPitchCom = InputFileData%BlPitch(1:p%NumBl)
 
+   !.......................................................
+   ! @mcd: in case we want to simulate the hybrid model in
+   ! some displaced orientation, initialize the external
+   ! displacement variables to the input file values.
+   !.......................................................
+   u%ExternalPtfmSurge = InputFileData%PtfmSurge
+   u%ExternalPtfmSway  = InputFileData%PtfmSway
+   u%ExternalPtfmHeave = InputFileData%PtfmHeave
+   u%ExternalPtfmRoll  = InputFileData%PtfmRoll
+   u%ExternalPtfmPitch = InputFileData%PtfmPitch
+   u%ExternalPtfmYaw   = InputFileData%PtfmYaw
+   u%ExternalTTDspFA   = InputFileData%TTDspFA
+   u%ExternalTTDspSS   = InputFileData%TTDspSS
    
    !.......................................................
    ! Create Line2 Meshes for loads input on blades:
@@ -9544,6 +9645,10 @@ SUBROUTINE ED_RK4( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat, ErrMsg 
 !      OtherState%HSSBrTrqC = SIGN( u_interp%HSSBrTrqC, x%QDT(DOF_GeAz) )         
 !      OtherState%HSSBrTrq  = OtherState%HSSBrTrqC         
 
+      ! @mcd: apply interpolated external inputs to x before deriving
+      ! @mcd: since x is stored in x_tmp then further predicted/corrected with that variable, we only need to do this once
+      CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
+      
       ! find xdot at t
       CALL ED_CalcContStateDeriv( t, u_interp, p, x, xd, z, OtherState, m, xdot, ErrStat2, ErrMsg2 )
          CALL CheckError(ErrStat2,ErrMsg2)
@@ -9744,6 +9849,10 @@ SUBROUTINE ED_AB4( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat, ErrMsg 
       END IF
       OtherState%HSSBrTrq   = OtherState%HSSBrTrqC
       OtherState%SgnPrvLSTQ = OtherState%SgnLSTQ(OtherState%IC(2))
+      
+      ! @mcd: apply interpolated external inputs to x before deriving
+      ! @mcd: since x is stored in x_tmp then further predicted/corrected with that variable, we only need to do this once
+      CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
       
       CALL ED_CalcContStateDeriv( t, u_interp, p, x, xd, z, OtherState, m, xdot, ErrStat2, ErrMsg2 )
          CALL CheckError(ErrStat2,ErrMsg2)

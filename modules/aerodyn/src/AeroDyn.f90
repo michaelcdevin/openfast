@@ -1086,17 +1086,8 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
 
       ! set values of m%BEMT_u(1) from inputs (uInterp) interpolated at t:
       ! I'm doing this second in case we want the other misc vars at t as before, but I don't think it matters
-      ! @mcd: this call is changed so that direct measurements are copied (not interpolated) into m%BEMT_u(1) since they are exact
-      ! @mcd: for debugging: if this keeps erroring out for debugging, try MESH_UPDATECOPY instead of MESH_NEWCOPY
    call AD_Input_ExtrapInterp(u,utimes,uInterp, t, errStat2, errMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-
-      CALL MeshCopy( u(2)%HubMotion, uInterp%HubMotion, MESH_NEWCOPY, errStat2, errMsg2 )
-         CALL SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
-         IF (ErrStat>=AbortErrLev) RETURN
-      CALL MeshCopy( u(2)%TowerMotion, uInterp%TowerMotion, MESH_NEWCOPY, errStat2, errMsg2 )
-         CALL SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
-         IF (ErrStat>=AbortErrLev) RETURN
 
    call SetInputs(p, uInterp, m, 1, errStat2, errMsg2)      
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)

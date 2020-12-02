@@ -260,8 +260,32 @@ SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD
    
    u_ED%TwrAddedMass  = 0.0_ReKi
    u_ED%PtfmAddedMass = 0.0_ReKi
+   
+   ! we're going to use the extrapolated values instead of the old values (Simulink inputs are from t, not t+dt)
+   CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED )
+   
                
 END SUBROUTINE ED_InputSolve
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine sets the inputs required for ElastoDyn from an external source (Simulink)
+SUBROUTINE ED_SetExternalInputs( p_FAST, m_FAST, u_ED )
+   
+   TYPE(FAST_ParameterType),         INTENT(IN)     :: p_FAST       !< Glue-code simulation parameters
+   TYPE(FAST_MiscVarType),           INTENT(IN)     :: m_FAST       !< Glue-code misc variables (including inputs from external sources like Simulink)
+   TYPE(AD_InputType),               INTENT(INOUT)  :: u_ED         !< ElastoDyn inputs
+   
+   
+      ! we are going to use extrapolated values because these external values from Simulink are at n instead of n+1
+   u_ED%ExternalPtfmSurge   =  m_FAST%ExternInput%PtfmSurge
+   u_ED%ExternalPtfmSway    =  m_FAST%ExternInput%PtfmSurge
+   u_ED%ExternalPtfmHeave   =  m_FAST%ExternInput%PtfmSurge
+   u_ED%ExternalPtfmPitch   =  m_FAST%ExternInput%PtfmSurge
+   u_ED%ExternalPtfmRoll    =  m_FAST%ExternInput%PtfmSurge
+   u_ED%ExternalPtfmYaw     =  m_FAST%ExternInput%PtfmSurge
+   u_ED%ExternalTTDspFA     =  m_FAST%ExternInput%PtfmSurge
+   u_ED%ExternalTTDspSS     =  m_FAST%ExternInput%PtfmSurge
+      
+END SUBROUTINE ED_SetExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine determines the points in space where InflowWind needs to compute wind speeds.
 SUBROUTINE IfW_InputSolve( p_FAST, m_FAST, u_IfW, p_IfW, u_AD14, u_AD, y_ED, ErrStat, ErrMsg )
@@ -356,34 +380,6 @@ SUBROUTINE IfW_SetExternalInputs( p_IfW, m_FAST, y_ED, u_IfW )
 
 
 END SUBROUTINE IfW_SetExternalInputs
-!----------------------------------------------------------------------------------------------------------------------------------
-!> This routine sets the inputs required for AeroDyn from an external source (Simulink)
-SUBROUTINE AD_SetExternalInputs( p_FAST, m_FAST, u_AD, MeshMapData, ErrStat, ErrMsg )
-!..................................................................................................................................
-   
-   TYPE(FAST_ParameterType),         INTENT(IN)     :: p_FAST       !< Glue-code simulation parameters
-   TYPE(FAST_MiscVarType),           INTENT(IN)     :: m_FAST       !< Glue-code misc variables (including inputs from external sources like Simulink)
-   TYPE(AD_InputType),               INTENT(INOUT)  :: u_AD         !< AeroDyn inputs at t
-   TYPE(FAST_ModuleMapType),         INTENT(INOUT)  :: MeshMapData  !< Data for mapping between modules
-   
-   INTEGER(IntKi)                                   :: ErrStat      !< Error status of the operation
-   CHARACTER(*)                                     :: ErrMsg       !< Error message if ErrStat /= ErrID_None
-
-      ! local variables
-   INTEGER(IntKi)                                   :: ErrStat2      ! Error status of the operation
-   CHARACTER(*)                                     :: ErrMsg2       ! Error message if ErrStat /= ErrID_None
-   
-     m_FAST%ExternInput%HubMotion%Position 
-
-      ! tower
-   CALL Transfer_Line2_to_Line2( m_FAST%ExternInput%TowerMotion, u_AD%TowerMotion, MeshMapData%ED_L_2_AD_L_T, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%TowerMotion' )      
-      
-      ! hub
-   CALL Transfer_Point_to_Point( m_FAST%ExternInput%HubMotion, u_AD%HubMotion, MeshMapData%ED_P_2_AD_P_H, ErrStat2, ErrMsg2 )
-      CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%HubMotion' ) 
-      
-END SUBROUTINE AD_SetExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the AeroDyn wind inflow inputs.
 SUBROUTINE AD_InputSolve_IfW( p_FAST, u_AD, y_IfW, y_OpFM, ErrStat, ErrMsg )
@@ -4990,6 +4986,8 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
    
       ! SolveOption2* routines are being called in FAST_AdvanceStates, but the first time we call CalcOutputs_And_SolveForInputs, we haven't called the AdvanceStates routine
    IF (firstCall) THEN
+      ! @mcd: Extrapolated Simulink inputs have not been applied to x%QT yet since FAST_AdvanceStates has not been called, so do that here:
+      CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x, ErrStat, ErrMsg)
       ! call ElastoDyn's CalcOutput & compute BD inputs from ED: 
       CALL SolveOption2a_Inp2BD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )

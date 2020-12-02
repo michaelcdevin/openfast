@@ -1220,16 +1220,14 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
    
    m_FAST%ExternInput%LidarFocus = 1.0_ReKi  ! make this non-zero (until we add the initial position in the InflowWind input file)
    
-   m_FAST%ExternInput%HubMotion%Position(:,1) = ED%Output(1)%HubPtMotion%Position(:,1)
-   m_FAST%ExternInput%HubMotion%Orientation(:,:,1) = ED%Output(1)%HubPtMotion%RefOrientation(:,:,1)
-   m_FAST%ExternInput%HubMotion%TranslationDisp(:,1) = 0.0_ReKi ! @mcd: not sure if this is right... AD uses matmul( transpose(orientation) - eye(3), AD%u(1)%HubMotion%Position(:,1) )
-   m_FAST%ExternInput%HubMotion%RotationVel(:,1) = m_FAST%ExternInput%HubMotion%Orientation(1,:,1) * ED%p%RotSpeed
-   do j=1,AD%Input(1)%TowerMotion%NNodes
-         m_FAST%ExternInput%TowerMotion%Position(:, j) = 0.0_ReKi
-         m_FAST%ExternInput%TowerMotion%Orientation(:,:, j) = AD%Input(1)%TowerMotion%RefOrientation(:,:,j)
-         m_FAST%ExternInput%TowerMotion%TranslationDisp(:, j) = 0.0_ReKi
-         m_FAST%ExternInput%TowerMotion%TranslationVel(:, j) = 0.0_ReKi
-   end do !j=nnodes
+   m_FAST%ExternInput%PtfmSurge = ED%Input(1)%ExternalPtfmSurge
+   m_FAST%ExternInput%PtfmSway  = ED%Input(1)%ExternalPtfmSway
+   m_FAST%ExternInput%PtfmHeave = ED%Input(1)%ExternalPtfmHeave
+   m_FAST%ExternInput%PtfmPitch = ED%Input(1)%ExternalPtfmPitch
+   m_FAST%ExternInput%PtfmRoll  = ED%Input(1)%ExternalPtfmRoll
+   m_FAST%ExternInput%PtfmYaw   = ED%Input(1)%ExternalPtfmYaw
+   m_FAST%ExternInput%TTDspFA   = ED%Input(1)%ExternalTTDspFA
+   m_FAST%ExternInput%TTDspSS   = ED%Input(1)%ExternalTTDspSS
    
    !...............................................................................................................................
    ! Destroy initializion data
@@ -3792,10 +3790,10 @@ SUBROUTINE FAST_Solution0(p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, O
    ! Solve input-output relations; this section of code corresponds to Eq. (35) in Gasmi et al. (2013)
    ! This code will be specific to the underlying modules
    
-      ! the initial ServoDyn and IfW/Lidar inputs from Simulink:
+      ! the initial ElastoDyn, ServoDyn and IfW/Lidar inputs from Simulink:
+   ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )   
-   IF ( p_FAST%CompInflow == Module_IfW ) CALL IfW_SetExternalInputs( IfW%p, m_FAST, ED%Output(1), IfW%Input(1) )  
-   IF ( p_FAST%CompAero == Module_AD) CALL AD_SetExternalInputs(p_FAST, m_FAST, AD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
+   IF ( p_FAST%CompInflow == Module_IfW ) CALL IfW_SetExternalInputs( IfW%p, m_FAST, ED%Output(1), IfW%Input(1) )
 
    CALL CalcOutputs_And_SolveForInputs(  n_t_global, m_FAST%t_global,  STATE_CURR, m_FAST%calcJacobian, m_FAST%NextJacCalcTime, &
                         p_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, &
@@ -4402,9 +4400,11 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
       NumCorrections = p_FAST%NumCrctn
    END IF   
    
-      ! the ServoDyn inputs from Simulink are for t, not t+dt, so we're going to overwrite the inputs from
+      ! the ServoDyn and ElastoDyn inputs from Simulink are for t, not t+dt, so we're going to overwrite the inputs from
       ! the previous step before we extrapolate these inputs:
-   IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )   
+   ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
+   IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )
+   
    
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    !! ## Step 1.a: Extrapolate Inputs 

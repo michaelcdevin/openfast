@@ -815,14 +815,14 @@ typedef	^	InputType	ReKi	BlPitchCom	{:}	-	-	"Commanded blade pitch angles"	radia
 typedef	^	InputType	ReKi	YawMom	-	-	-	"Torque transmitted through the yaw bearing"	N-m
 typedef	^	InputType	ReKi	GenTrq	-	-	-	"Electrical generator torque"	N-m
 typedef	^	InputType	ReKi	HSSBrTrqC	-	-	-	"Commanded HSS brake torque"	N-m
-typedef	^	InputType	ReKi	TTDspFA	-	-	-	"Initial fore-aft tower-top displacement"	meters
-typedef	^	InputType	ReKi	TTDspSS	-	-	-	"Initial side-to-side tower-top displacement"	meters
-typedef	^	InputType	ReKi	PtfmSurge	-	-	-	"Initial horizontal surge translational displacement of platform"	meters
-typedef	^	InputType	ReKi	PtfmSway	-	-	-	"Initial horizontal sway translational displacement of platform"	meters
-typedef	^	InputType	ReKi	PtfmHeave	-	-	-	"Initial vertical heave translational displacement of platform"	meters
-typedef	^	InputType	ReKi	PtfmRoll	-	-	-	"Initial roll tilt rotational displacement of platform"	radians
-typedef	^	InputType	ReKi	PtfmPitch	-	-	-	"Initial pitch tilt rotational displacement of platform"	radians
-typedef	^	InputType	ReKi	PtfmYaw	-	-	-	"Initial yaw rotational displacement of platform"	radians
+typedef	^	InputType	ReKi	ExternalTTDspFA	-	-	-	"Commanded fore-aft tower-top displacement from Simulink"	meters
+typedef	^	InputType	ReKi	ExternalTTDspSS	-	-	-	"Commanded side-to-side tower-top displacement from Simulink"	meters
+typedef	^	InputType	ReKi	ExternalPtfmSurge	-	-	-	"Commanded horizontal surge translational displacement of platform from Simulink"	meters
+typedef	^	InputType	ReKi	ExternalPtfmSway	-	-	-	"Commanded horizontal sway translational displacement of platform from Simulink"	meters
+typedef	^	InputType	ReKi	ExternalPtfmHeave	-	-	-	"Commanded vertical heave translational displacement of platform from Simulink"	meters
+typedef	^	InputType	ReKi	ExternalPtfmRoll	-	-	-	"Commanded roll tilt rotational displacement of platform from Simulink"	radians
+typedef	^	InputType	ReKi	ExternalPtfmPitch	-	-	-	"Commanded pitch tilt rotational displacement of platform from Simulink"	radians
+typedef	^	InputType	ReKi	ExternalPtfmYaw	-	-	-	"Commanded yaw rotational displacement of platform from Simulink"	radians
 
 # ..... Outputs ...................................................................................................................
 # Define outputs that are contained on the mesh here:
