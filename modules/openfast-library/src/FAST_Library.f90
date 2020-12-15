@@ -182,7 +182,7 @@ subroutine FAST_Start(iTurb, NumInputs_c, NumOutputs_c, InputAry, OutputAry, Err
    n_t_global = 0
 
 #ifdef SIMULINK_DirectFeedThrough   
-   IF(  NumInputs_c /= NumFixedInputs .AND. NumInputs_c /= NumFixedInputs+3 ) THEN
+   IF(  NumInputs_c /= NumFixedInputs .AND. NumInputs_c /= NumFixedInputs+3 .AND. NumInputs_c /= NumFixedInputs+11) THEN
       ErrStat_c = ErrID_Fatal
       ErrMsg_c  = TRANSFER( "FAST_Start:size of InputAry is invalid."//C_NULL_CHAR, ErrMsg_c )
       RETURN
@@ -269,7 +269,7 @@ subroutine FAST_Update(iTurb, NumInputs_c, NumOutputs_c, InputAry, OutputAry, Er
       ErrMsg    = "FAST_Update:size of OutputAry is invalid or FAST has too many outputs."//C_NULL_CHAR
       ErrMsg_c  = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
       RETURN
-   ELSEIF(  NumInputs_c /= NumFixedInputs .AND. NumInputs_c /= NumFixedInputs+3 ) THEN
+   ELSEIF( NumInputs_c /= NumFixedInputs .AND. NumInputs_c /= NumFixedInputs+3 .AND. NumInputs_c /= NumFixedInputs+11 ) THEN
       ErrStat_c = ErrID_Fatal
       ErrMsg    = "FAST_Update:size of InputAry is invalid."//C_NULL_CHAR
       ErrMsg_c  = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
@@ -326,28 +326,33 @@ subroutine FAST_SetExternalInputs(iTurb, NumInputs_c, InputAry, m_FAST)
          ! transfer inputs from Simulink to FAST
       IF ( NumInputs_c < NumFixedInputs ) RETURN ! This is an error
       
-      m_FAST%ExternInput%GenTrq      = InputAry(1)
-      m_FAST%ExternInput%ElecPwr     = InputAry(2)
-      m_FAST%ExternInput%YawPosCom   = InputAry(3)
-      m_FAST%ExternInput%YawRateCom  = InputAry(4)
-      m_FAST%ExternInput%BlPitchCom  = InputAry(5:7)
-      m_FAST%ExternInput%HSSBrFrac   = InputAry(8)         
+         m_FAST%ExternInput%PtfmSurge = InputAry(1)
+         m_FAST%ExternInput%PtfmSway  = InputAry(2)
+         m_FAST%ExternInput%PtfmHeave = InputAry(3)
+         m_FAST%ExternInput%PtfmPitch = InputAry(4)
+         m_FAST%ExternInput%PtfmRoll  = InputAry(5)
+         m_FAST%ExternInput%PtfmYaw   = InputAry(6)
+         m_FAST%ExternInput%TTDspFA   = InputAry(7)
+         m_FAST%ExternInput%TTDspSS   = InputAry(8)
             
       IF ( NumInputs_c > NumFixedInputs ) THEN  ! NumFixedInputs is the fixed number of inputs
-         IF ( NumInputs_c == NumFixedInputs + 3 ) & ! InflowWind integration
+         IF ( NumInputs_c == NumFixedInputs + 3 ) & ! ED + IfW inputs, no IfW inputs
              m_FAST%ExternInput%LidarFocus = InputAry(9:11)
-         IF ( NumInputs_c == NumFixedInputs + 378) & ! AeroDyn integration
-             m_FAST%ExternInput%HubMotion%Position = InputAry(9:11)
-             m_FAST%ExternInput%HubMotion%Orientation = RESHAPE(InputAry(12:20), [3,3])
-             m_FAST%ExternInput%HubMotion%TranslationDisp = InputAry(21:23)
-             m_FAST%ExternInput%HubMotion%RotationVel = InputAry(24:26)
-             DO j = 1, num_twr_nodes
-                k = 27 * j
-                m_FAST%ExternInput%TowerMotion%Position(:,j) = InputAry(k:k+2)
-                m_FAST%ExternInput%TowerMotion%Orientation(:,:,j) = RESHAPE(InputAry(k+3:k+11), [3,3])
-                m_FAST%ExternInput%TowerMotion%TranslationDisp(:,j) = InputAry(k+12:k+14)
-                m_FAST%ExternInput%TowerMotion%TranslationVel(:,j) = InputAry(k+15:k+17)
-             END DO
+         IF ( NumInputs_c == NumFixedInputs + 8 ) & ! ED + SrvD inputs, no IfW inputs
+             m_FAST%ExternInput%GenTrq      = InputAry(9)
+             m_FAST%ExternInput%ElecPwr     = InputAry(10)
+             m_FAST%ExternInput%YawPosCom   = InputAry(11)
+             m_FAST%ExternInput%YawRateCom  = InputAry(12)
+             m_FAST%ExternInput%BlPitchCom  = InputAry(13:15)
+             m_FAST%ExternInput%HSSBrFrac   = InputAry(16)  
+         IF ( Numinputs_c == NumFixedInputs + 11 ) & ! SrvD + IfW + ED inputs
+             m_FAST%ExternInput%GenTrq      = InputAry(9)
+             m_FAST%ExternInput%ElecPwr     = InputAry(10)
+             m_FAST%ExternInput%YawPosCom   = InputAry(11)
+             m_FAST%ExternInput%YawRateCom  = InputAry(12)
+             m_FAST%ExternInput%BlPitchCom  = InputAry(13:15)
+             m_FAST%ExternInput%HSSBrFrac   = InputAry(16)
+             m_FAST%ExternInput%LidarFocus = InputAry(17:19)
         END IF
       
 end subroutine FAST_SetExternalInputs

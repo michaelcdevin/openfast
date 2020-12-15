@@ -28,6 +28,12 @@ MODULE ElastoDyn_Parameters
 
    TYPE(ProgDesc), PARAMETER  :: ED_Ver = ProgDesc( 'ElastoDyn', '', '' )
    
+#ifdef COMPILE_SIMULINK
+   LOGICAL, PARAMETER, PUBLIC           :: Cmpl4SFun  = .TRUE.                            ! Is the module being compiled as an S-Function for Simulink?
+#else
+   LOGICAL, PARAMETER, PUBLIC           :: Cmpl4SFun  = .FALSE.                           ! Is the module being compiled as an S-Function for Simulink?
+#endif
+
    REAL(ReKi), PARAMETER      :: SmallAngleLimit_Deg  =  15.0                     ! Largest input angle considered "small" (used as a check on input data), degrees
 
 
@@ -89,7 +95,9 @@ MODULE ElastoDyn_Parameters
    INTEGER(IntKi), PARAMETER        :: Method_AB4  = 2
    INTEGER(IntKi), PARAMETER        :: Method_ABM4 = 3
 
-
+   INTEGER(IntKi), PARAMETER        :: DispMode_INTERNAL   = 1          !< The (ElastoDyn-universal) control code for obtaining the displacement values through normal FAST simulations
+   INTEGER(IntKi), PARAMETER        :: DispMode_EXTERNAL   = 2          !< The (ElastoDyn-universal) control code for obtaining the displacement values from Simulink  
+   
    INTEGER(IntKi), PARAMETER        :: PolyOrd  =  6                                    ! Order of the polynomial describing the mode shape
 
 
@@ -3379,6 +3387,15 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, BldFile, FurlFile, TwrFile
          RETURN
       END IF
       
+      ! DispMode - Displacement control mode, internal (i.e. normal OpenFAST) or external (i.e. Simulink)
+   CALL ReadVar( UnIn, InputFile, InputFileData%DispMode, "DispMode", "Displacement control mode: {1: Internal (normal FAST routine), 2: External (Simulink)}", ErrStat2, ErrMsg2, UnEc)
+      CALL CheckErrState( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      IF ( ErrStat >= AbortErrLev ) THEN
+          CALL Cleanup()
+          RETURN
+      END IF 
+      
+      
       ! DT - Requested integration time for ElastoDyn (seconds):
    CALL ReadVar( UnIn, InputFile, Line, "DT", "Requested integration time for ElastoDyn (seconds)", ErrStat2, ErrMsg2, UnEc)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -4986,7 +5003,18 @@ SUBROUTINE ValidatePrimaryData( InputFileData, BD4Blades, Linearize, ErrStat, Er
       END IF
    END IF
 
-
+      ! Make sure the specified displacement mode is valid:
+   IF ( InputFileData%DispMode .ne. DispMode_INTERNAL) THEN
+       IF ( InputFileData%DispMode .eq. DispMode_EXTERNAL)  THEN
+          IF ( .NOT. Cmpl4SFun) THEN ! Not interfacing with Simulink
+             CALL SetErrStat( ErrID_Fatal, 'DispMode can equal '//TRIM(Num2LStr(ControlMode_EXTERN))//' only when ElastoDyn is interfaced with Simulink.'// &
+                         '  Set DispMode to 1 or interface ElastoDyn with Simulink.', ErrStat, ErrMsg, RoutineName )          
+          END IF
+       ELSE ! Invalid input value
+          CALL SetErrStat( ErrID_Fatal, 'Displacement mode must be 1 (internal) or 2 (external)',ErrStat,ErrMsg,RoutineName)
+       END IF
+   END IF
+   
       ! make sure GBoxEff is 100% for now
    IF ( .NOT. EqualRealNos( InputFileData%GBoxEff, 1.0_ReKi ) .and. InputFileData%method == method_rk4 ) &
       CALL SetErrStat( ErrID_Fatal, 'GBoxEff must be 1 (i.e., 100%) when using RK4.',ErrStat,ErrMsg,RoutineName)

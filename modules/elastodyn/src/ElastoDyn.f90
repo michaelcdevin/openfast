@@ -31,9 +31,12 @@ MODULE ElastoDyn
    IMPLICIT NONE
 
    PRIVATE
+
    
    REAL(R8Ki)  :: MinPerturb = SQRT( EPSILON( 1.0_R8Ki ) ) ! minimum value for perturbation in ED jacobians
-
+   
+   INTEGER(IntKi), PARAMETER :: DispMode_INTERNAL   = 1          !< The (ElastoDyn-universal) control code for obtaining the displacement values through normal FAST simulations
+   INTEGER(IntKi), PARAMETER :: DispMode_EXTERNAL   = 2          !< The (ElastoDyn-universal) control code for obtaining the displacement values from Simulink
 
       ! ..... Public Subroutines ...................................................................................................
 
@@ -3515,6 +3518,7 @@ SUBROUTINE SetPrimaryParameters( p, InputFileData, ErrStat, ErrMsg  )
    p%TipRad    = InputFileData%TipRad
    p%HubRad    = InputFileData%HubRad
    p%method    = InputFileData%method
+   p%DispMode  = InputFileData%DispMode
    p%TwrNodes  = InputFileData%TwrNodes
 
    p%PtfmCMxt = InputFileData%PtfmCMxt
@@ -9647,7 +9651,9 @@ SUBROUTINE ED_RK4( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat, ErrMsg 
 
       ! @mcd: apply interpolated external inputs to x before deriving
       ! @mcd: since x is stored in x_tmp then further predicted/corrected with that variable, we only need to do this once
-      CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
+      IF ( p%DispMode == DispMode_EXTERNAL) THEN
+         CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
+      END IF
       
       ! find xdot at t
       CALL ED_CalcContStateDeriv( t, u_interp, p, x, xd, z, OtherState, m, xdot, ErrStat2, ErrMsg2 )
@@ -9852,7 +9858,9 @@ SUBROUTINE ED_AB4( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat, ErrMsg 
       
       ! @mcd: apply interpolated external inputs to x before deriving
       ! @mcd: since x is stored in x_tmp then further predicted/corrected with that variable, we only need to do this once
-      CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
+      IF ( p%DispMode == DispMode_EXTERNAL) THEN
+         CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
+      END IF
       
       CALL ED_CalcContStateDeriv( t, u_interp, p, x, xd, z, OtherState, m, xdot, ErrStat2, ErrMsg2 )
          CALL CheckError(ErrStat2,ErrMsg2)

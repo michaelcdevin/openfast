@@ -277,13 +277,13 @@ SUBROUTINE ED_SetExternalInputs( p_FAST, m_FAST, u_ED )
    
       ! we are going to use extrapolated values because these external values from Simulink are at n instead of n+1
    u_ED%ExternalPtfmSurge   =  m_FAST%ExternInput%PtfmSurge
-   u_ED%ExternalPtfmSway    =  m_FAST%ExternInput%PtfmSurge
-   u_ED%ExternalPtfmHeave   =  m_FAST%ExternInput%PtfmSurge
-   u_ED%ExternalPtfmPitch   =  m_FAST%ExternInput%PtfmSurge
-   u_ED%ExternalPtfmRoll    =  m_FAST%ExternInput%PtfmSurge
-   u_ED%ExternalPtfmYaw     =  m_FAST%ExternInput%PtfmSurge
-   u_ED%ExternalTTDspFA     =  m_FAST%ExternInput%PtfmSurge
-   u_ED%ExternalTTDspSS     =  m_FAST%ExternInput%PtfmSurge
+   u_ED%ExternalPtfmSway    =  m_FAST%ExternInput%PtfmSway
+   u_ED%ExternalPtfmHeave   =  m_FAST%ExternInput%PtfmHeave
+   u_ED%ExternalPtfmPitch   =  m_FAST%ExternInput%PtfmPitch
+   u_ED%ExternalPtfmRoll    =  m_FAST%ExternInput%PtfmRoll
+   u_ED%ExternalPtfmYaw     =  m_FAST%ExternInput%PtfmYaw
+   u_ED%ExternalTTDspFA     =  m_FAST%ExternInput%TTDspFA
+   u_ED%ExternalTTDspSS     =  m_FAST%ExternInput%TTDspSS
       
 END SUBROUTINE ED_SetExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -4987,7 +4987,9 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
       ! SolveOption2* routines are being called in FAST_AdvanceStates, but the first time we call CalcOutputs_And_SolveForInputs, we haven't called the AdvanceStates routine
    IF (firstCall) THEN
       ! @mcd: Extrapolated Simulink inputs have not been applied to x%QT yet since FAST_AdvanceStates has not been called, so do that here:
-      CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x, ErrStat, ErrMsg)
+      IF ( ED%p%DispMode == 2) THEN
+         CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x, ErrStat, ErrMsg)
+      END IF
       ! call ElastoDyn's CalcOutput & compute BD inputs from ED: 
       CALL SolveOption2a_Inp2BD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
