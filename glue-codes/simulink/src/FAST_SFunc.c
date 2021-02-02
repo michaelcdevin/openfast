@@ -216,19 +216,34 @@ static void mdlInitializeSizes(SimStruct *S)
 
   
        // put the names of the output channels in a cell-array variable called "OutList" in the base matlab workspace
+       // @mcd: I duplicated this section to hack a fix for the two-variable OutList problem.
        m = NumOutputs;
        n = 1;
        pm = mxCreateCellMatrix(m, n);
-       for (i = 0; i < NumOutputs; i++){
-          j = CHANNEL_LENGTH - 1;
-          while (ChannelNames[i*CHANNEL_LENGTH + j] == ' '){
+       for (i = 0; i < NumOutputs; i = i+2){ //@mcd: increment was +1
+           // @mcd: get first variable name
+          j = CHANNEL_LENGTH - 11; // @mcd: was -1
+          while (ChannelNames[i*(CHANNEL_LENGTH-10) + j] == ' '){
              j--;
           }
-          strncpy(&OutList[0], &ChannelNames[i*CHANNEL_LENGTH], j+1);
+          strncpy(&OutList[0], &ChannelNames[i*(CHANNEL_LENGTH-10)], j+1);
           OutList[j + 1] = '\0';
 
           chrAry = mxCreateString(OutList);
           indx = i;
+          mxSetCell(pm, indx, chrAry);
+          //mxDestroyArray(chrAry);
+
+          // @mcd: get second variable name
+          j = CHANNEL_LENGTH - 11; // @mcd: was -1
+          while (ChannelNames[(i+1)*(CHANNEL_LENGTH-10) + j] == ' ') { //@mcd: added +10
+              j--;
+          }
+          strncpy(&OutList[0], &ChannelNames[(i+1)*(CHANNEL_LENGTH-10)], j+1); //@mcd: added +10
+          OutList[j + 1] = '\0';
+
+          chrAry = mxCreateString(OutList);
+          indx = i+1;
           mxSetCell(pm, indx, chrAry);
           //mxDestroyArray(chrAry);
        }

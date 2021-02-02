@@ -121,10 +121,11 @@ END SUBROUTINE BD_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the inputs required for ED--using the Option 2 solve method; currently the only input not solved in this routine
 !! are the fields on PlatformPtMesh and HubPtLoad,  which are solved in option 1.
-SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD, u_SrvD, MeshMapData, ErrStat, ErrMsg )
+SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD, u_SrvD, MeshMapData, ErrStat, ErrMsg )
 !..................................................................................................................................
 
    TYPE(FAST_ParameterType),       INTENT(IN   )  :: p_FAST                   !< Glue-code simulation parameters
+   TYPE(FAST_MiscVarType),         INTENT(IN   )  :: m_FAST                   !< misc FAST data, including inputs from external codes like Simulink      
    TYPE(ED_InputType),             INTENT(INOUT)  :: u_ED                     !< ED Inputs at t
    TYPE(ED_OutputType),            INTENT(IN   )  :: y_ED                     !< ElastoDyn outputs (need translation displacement on meshes for loads mapping)
    TYPE(AD14_ParameterType),       INTENT(IN   )  :: p_AD14                   !< AeroDyn14 parameters (a hack because the AD14 meshes aren't set up properly)
@@ -261,9 +262,8 @@ SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD
    u_ED%TwrAddedMass  = 0.0_ReKi
    u_ED%PtfmAddedMass = 0.0_ReKi
    
-   ! we're going to use the extrapolated values instead of the old values (Simulink inputs are from t, not t+dt)
-   CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED )
    
+   CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED )     
                
 END SUBROUTINE ED_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -272,7 +272,7 @@ SUBROUTINE ED_SetExternalInputs( p_FAST, m_FAST, u_ED )
    
    TYPE(FAST_ParameterType),         INTENT(IN)     :: p_FAST       !< Glue-code simulation parameters
    TYPE(FAST_MiscVarType),           INTENT(IN)     :: m_FAST       !< Glue-code misc variables (including inputs from external sources like Simulink)
-   TYPE(AD_InputType),               INTENT(INOUT)  :: u_ED         !< ElastoDyn inputs
+   TYPE(ED_InputType),               INTENT(INOUT)  :: u_ED         !< ElastoDyn inputs
    
    
       ! we are going to use extrapolated values because these external values from Simulink are at n instead of n+1
@@ -4987,9 +4987,9 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
       ! SolveOption2* routines are being called in FAST_AdvanceStates, but the first time we call CalcOutputs_And_SolveForInputs, we haven't called the AdvanceStates routine
    IF (firstCall) THEN
       ! @mcd: Extrapolated Simulink inputs have not been applied to x%QT yet since FAST_AdvanceStates has not been called, so do that here:
-      IF ( ED%p%DispMode == 2) THEN
-         CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x, ErrStat, ErrMsg)
-      END IF
+      !IF ( p_FAST%DispMode == DispMode_EXTERNAL) THEN
+      !   CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x(this_state), ErrStat2, ErrMsg2)
+      !END IF
       ! call ElastoDyn's CalcOutput & compute BD inputs from ED: 
       CALL SolveOption2a_Inp2BD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -5038,7 +5038,7 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
               
       
    !bjj: note ED%Input(1) may be a sibling mesh of output, but ED%u is not (routine may update something that needs to be shared between siblings)      
-   CALL ED_InputSolve( p_FAST, ED%Input(1), ED%Output(1), AD14%p, AD14%y, AD%y, SrvD%y, AD%Input(1), SrvD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
+   CALL ED_InputSolve( p_FAST, m_FAST, ED%Input(1), ED%Output(1), AD14%p, AD14%y, AD%y, SrvD%y, AD%Input(1), SrvD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    
    CALL BD_InputSolve( p_FAST, BD, AD%y, AD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
@@ -5088,7 +5088,8 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED
    INTEGER(IntKi)                          :: n_t_module          ! simulation time step, loop counter for individual modules       
    INTEGER(IntKi)                          :: ErrStat2
    CHARACTER(ErrMsgLen)                    :: ErrMsg2
-   CHARACTER(*), PARAMETER                 :: RoutineName = 'FAST_AdvanceStates'       
+   CHARACTER(*), PARAMETER                 :: RoutineName = 'FAST_AdvanceStates'
+   REAL(DbKi)                              :: disps(24)
    
    
    
@@ -5096,7 +5097,8 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED
    ErrMsg  = ""
 
    t_global_next = (n_t_global+1) * p_FAST%dt + t_initial
-
+   disps = ED%x(STATE_CURR)%qt(:)
+   ED%x(STATE_CURR)%qt(:) = disps
    !----------------------------------------------------------------------------------------
    ! copy the states at step m_FAST%t_global and get prediction for step t_global_next
    ! (note that we need to copy the states because UpdateStates updates the values

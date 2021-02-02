@@ -1572,7 +1572,7 @@ SUBROUTINE FAST_Init( p, y_FAST, t_initial, InputFile, ErrStat, ErrMsg, TMax, Tu
    y_FAST%Module_Abrev( Module_MD     ) = 'MD'
    y_FAST%Module_Abrev( Module_Orca   ) = 'Orca'
    y_FAST%Module_Abrev( Module_IceF   ) = 'IceF'
-   y_FAST%Module_Abrev( Module_IceD   ) = 'IceD'   
+   y_FAST%Module_Abrev( Module_IceD   ) = 'IceD'
    
    p%n_substeps = 1                                                ! number of substeps for between modules and global/FAST time
    p%BD_OutputSibling = .false.
@@ -1910,7 +1910,6 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, InitOutData_ED, InitOutData_BD, Init
       y_FAST%Module_Ver( Module_IceD )   = InitOutData_IceD%Ver
       y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_IceD )))   
    END IF      
-   
    !......................................................
    ! Set the number of output columns from each module
    !......................................................
@@ -1937,7 +1936,7 @@ end do
    IF ( ALLOCATED( InitOutData_MD%WriteOutputHdr     ) ) y_FAST%numOuts(Module_MD)     = SIZE(InitOutData_MD%WriteOutputHdr)
    IF ( ALLOCATED( InitOutData_Orca%WriteOutputHdr   ) ) y_FAST%numOuts(Module_Orca)   = SIZE(InitOutData_Orca%WriteOutputHdr)
    IF ( ALLOCATED( InitOutData_IceF%WriteOutputHdr   ) ) y_FAST%numOuts(Module_IceF)   = SIZE(InitOutData_IceF%WriteOutputHdr)
-   IF ( ALLOCATED( InitOutData_IceD%WriteOutputHdr   ) ) y_FAST%numOuts(Module_IceD)   = SIZE(InitOutData_IceD%WriteOutputHdr)*p_FAST%numIceLegs         
+   IF ( ALLOCATED( InitOutData_IceD%WriteOutputHdr   ) ) y_FAST%numOuts(Module_IceD)   = SIZE(InitOutData_IceD%WriteOutputHdr)*p_FAST%numIceLegs
    
    !......................................................
    ! Initialize the output channel names and units
@@ -2515,7 +2514,6 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, OverrideAbortErrLev, ErrStat, Err
          ELSE
             p%CompIce = Module_Unknown
          END IF
-               
 
    !---------------------- INPUT FILES ---------------------------------------------
    CALL ReadCom( UnIn, InputFile, 'Section Header: Input Files', ErrStat2, ErrMsg2, UnEc )
@@ -3791,7 +3789,10 @@ SUBROUTINE FAST_Solution0(p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, O
    ! This code will be specific to the underlying modules
    
       ! the initial ElastoDyn, ServoDyn and IfW/Lidar inputs from Simulink:
-   ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
+   IF ( ED%p%DispMode == 2) THEN
+      CALL ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
+      CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x(STATE_CURR), ErrStat2, ErrMsg2)
+   END IF
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )   
    IF ( p_FAST%CompInflow == Module_IfW ) CALL IfW_SetExternalInputs( IfW%p, m_FAST, ED%Output(1), IfW%Input(1) )
 
@@ -4402,9 +4403,12 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
    
       ! the ServoDyn and ElastoDyn inputs from Simulink are for t, not t+dt, so we're going to overwrite the inputs from
       ! the previous step before we extrapolate these inputs:
-   ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
+   IF ( ED%p%DispMode == 2) THEN
+      CALL ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
+      CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x(STATE_CURR), ErrStat2, ErrMsg2)
+   END IF
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )
-   
+
    
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    !! ## Step 1.a: Extrapolate Inputs 

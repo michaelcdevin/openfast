@@ -3389,12 +3389,11 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, BldFile, FurlFile, TwrFile
       
       ! DispMode - Displacement control mode, internal (i.e. normal OpenFAST) or external (i.e. Simulink)
    CALL ReadVar( UnIn, InputFile, InputFileData%DispMode, "DispMode", "Displacement control mode: {1: Internal (normal FAST routine), 2: External (Simulink)}", ErrStat2, ErrMsg2, UnEc)
-      CALL CheckErrState( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF ( ErrStat >= AbortErrLev ) THEN
           CALL Cleanup()
           RETURN
       END IF 
-      
       
       ! DT - Requested integration time for ElastoDyn (seconds):
    CALL ReadVar( UnIn, InputFile, Line, "DT", "Requested integration time for ElastoDyn (seconds)", ErrStat2, ErrMsg2, UnEc)
@@ -5007,7 +5006,7 @@ SUBROUTINE ValidatePrimaryData( InputFileData, BD4Blades, Linearize, ErrStat, Er
    IF ( InputFileData%DispMode .ne. DispMode_INTERNAL) THEN
        IF ( InputFileData%DispMode .eq. DispMode_EXTERNAL)  THEN
           IF ( .NOT. Cmpl4SFun) THEN ! Not interfacing with Simulink
-             CALL SetErrStat( ErrID_Fatal, 'DispMode can equal '//TRIM(Num2LStr(ControlMode_EXTERN))//' only when ElastoDyn is interfaced with Simulink.'// &
+             CALL SetErrStat( ErrID_Fatal, 'DispMode can equal '//TRIM(Num2LStr(DispMode_EXTERNAL))//' only when ElastoDyn is interfaced with Simulink.'// &
                          '  Set DispMode to 1 or interface ElastoDyn with Simulink.', ErrStat, ErrMsg, RoutineName )          
           END IF
        ELSE ! Invalid input value

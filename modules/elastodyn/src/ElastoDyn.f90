@@ -52,8 +52,8 @@ MODULE ElastoDyn
 
    PUBLIC :: ED_CalcConstrStateResidual        ! Tight coupling routine for returning the constraint state residual
    PUBLIC :: ED_CalcContStateDeriv             ! Tight coupling routine for computing derivatives of continuous states
-   PUBLIC :: ED_Disc_UpdateStates              ! Tight coupling routine for updating discrete states
-
+   PUBLIC :: ED_UpdateDiscState                ! Tight coupling routine for updating discrete states
+   
    PUBLIC :: ED_JacobianPInput                 ! Routine to compute the Jacobians of the output (Y), continuous- (X), discrete-
                                                !   (Xd), and constraint-state (Z) equations all with respect to the inputs (u)
    PUBLIC :: ED_JacobianPContState             ! Routine to compute the Jacobians of the output (Y), continuous- (X), discrete-
@@ -481,42 +481,42 @@ SUBROUTINE ED_Disp_UpdateStates( u, p, x, ErrStat, ErrMsg )
       ErrMsg  = ""     
       
          ! Extract and format displacement values from external inputs (Simulink)
-      ED_FormatDispInputs( u, PtfmDisplacement, TTDisplacement )
+      CALL ED_FormatDispInputs( u, PtfmDisplacement, TTDisplacement )
       
          ! Apply displacement values to continuous state variables if DOFs are enabled
       IF ( p%DOF_Flag(DOF_Sg) )  THEN
-          x%QT( DOF_Sg ) = PtfmDisp(1)      ! Platform surge
+          x%QT( DOF_Sg ) = PtfmDisplacement(1)      ! Platform surge
       ENDIF
       
       IF ( p%DOF_Flag(DOF_Sw) )  THEN
-          x%QT( DOF_Sw ) = PtfmDisp(2)      ! Platform sway
+          x%QT( DOF_Sw ) = PtfmDisplacement(2)      ! Platform sway
       ENDIF
       
       IF ( p%DOF_Flag(DOF_Hv) )  THEN
-          x%QT( DOF_Hv ) = PtfmDisp(3)      ! Platform heave
+          x%QT( DOF_Hv ) = PtfmDisplacement(3)      ! Platform heave
       ENDIF
       
       IF ( p%DOF_Flag(DOF_P) )  THEN
-          x%QT( DOF_P ) = PtfmDisp(4)       ! Platform pitch
+          x%QT( DOF_P ) = PtfmDisplacement(4)*D2R   ! Platform pitch
       ENDIF
       
       IF ( p%DOF_Flag(DOF_R) )  THEN
-          x%QT( DOF_R ) = PtfmDisp(5)       ! Platform roll
+          x%QT( DOF_R ) = PtfmDisplacement(5)*D2R   ! Platform roll
       ENDIF
       
       IF ( p%DOF_Flag(DOF_Y) )  THEN
-          x%QT( DOF_Y ) = PtfmDisp(6)       ! Platform yaw
+          x%QT( DOF_Y ) = PtfmDisplacement(6)*D2R   ! Platform yaw
       ENDIF
       
-      IF ( p%DOF_Flag(DOF_TFA1) )  THEN     ! First fore-aft tower mode is enabled.
+      IF ( p%DOF_Flag(DOF_TFA1) )  THEN             ! First fore-aft tower mode is enabled.
         x%QT(DOF_TFA1) =  TTDisplacement(1)
-      ELSEIF( p%DOF_Flag(DOF_TFA2) )  THEN  ! Second fore-aft tower mode is enabled, but first is not.
+      ELSEIF( p%DOF_Flag(DOF_TFA2) )  THEN          ! Second fore-aft tower mode is enabled, but first is not.
         x%QT(DOF_TFA2) =  TTDisplacement(1)
       ENDIF
 
-      IF ( p%DOF_Flag(DOF_TSS1 )  THEN      ! First side-to-side tower mode is enabled.
+      IF ( p%DOF_Flag(DOF_TSS1 ) )  THEN            ! First side-to-side tower mode is enabled.
         x%QT(DOF_TSS1) = -TTDisplacement(2)
-      ELSEIF( p%DOF_Flag(DOF_TSS2) )  THEN  ! Second side-to-side tower mode is enabled, but first is not.
+      ELSEIF( p%DOF_Flag(DOF_TSS2) )  THEN          ! Second side-to-side tower mode is enabled, but first is not.
         x%QT(DOF_TSS2) = -TTDisplacement(2)
       ENDIF
 
@@ -526,7 +526,7 @@ END SUBROUTINE ED_Disp_UpdateStates
 SUBROUTINE ED_FormatDispInputs( u, PtfmDisplacement, TTDisplacement)
 !..................................................................................................................................
     
-      REAL(ED_InputType),              INTENT(IN   ) :: u                    !< Inputs at t
+      TYPE(ED_InputType),              INTENT(IN   ) :: u                    !< Inputs at t
       REAL(ReKi),                      INTENT(  OUT) :: PtfmDisplacement(6)  !< Six DOFs of platform displacement
                                                                              !!   in order: surge, sway, heave, pitch, roll, yaw
       REAL(ReKi),                      INTENT(  OUT) :: TTDisplacement(2)    !< Two DOFs of tower top displacment
@@ -625,7 +625,9 @@ SUBROUTINE ED_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
    INTEGER(IntKi)               :: ErrStat2                                        ! Temporary Error code
    CHARACTER(ErrMsgLen)         :: ErrMsg2                                         ! Temporary error message
    
-
+   REAL(ReKi)                   :: TTDspFA
+   REAL(ReKi)                   :: TTDspSS
+   
    LOGICAL, PARAMETER           :: UpdateValues  = .TRUE.                          ! determines if the OtherState values need to be updated
    TYPE(ED_ContinuousStateType) :: dxdt                                            ! Continuous state derivs at t
 
@@ -950,6 +952,8 @@ END IF
    m%AllOuts(YawBrTDyp) = -DOT_PRODUCT(     rOPO, m%CoordSys%b3 )
    m%AllOuts(YawBrTDzp) =  DOT_PRODUCT(     rOPO, m%CoordSys%b2 )
    m%AllOuts(YawBrTDxt) =  DOT_PRODUCT(     rOPO, m%CoordSys%a1 )
+   TTDspFA = DOT_PRODUCT(     rOPO, m%CoordSys%a1 )
+   TTDspSS = -DOT_PRODUCT(     rOPO, m%CoordSys%a3 )
    m%AllOuts(YawBrTDyt) = -DOT_PRODUCT(     rOPO, m%CoordSys%a3 )
    m%AllOuts(YawBrTDzt) =  DOT_PRODUCT(     rOPO, m%CoordSys%a2 )
    m%AllOuts(YawBrTAxp) =  DOT_PRODUCT( LinAccEO, m%CoordSys%b1 )
@@ -1820,8 +1824,7 @@ END IF
    y%BlPitch  = u%BlPitchCom !OtherState%BlPitch
    y%LSS_Spd  = x%QDT(DOF_GeAz)
    y%HSS_Spd  = ABS(p%GBRatio)*x%QDT(DOF_GeAz)
-   y%
-   = x%QDT(DOF_GeAz) + x%QDT(DOF_DrTr)
+   y%RotSpeed = x%QDT(DOF_GeAz) + x%QDT(DOF_DrTr)
    
    IF ( t > 0.0_DbKi  )  THEN
 
@@ -9651,9 +9654,9 @@ SUBROUTINE ED_RK4( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat, ErrMsg 
 
       ! @mcd: apply interpolated external inputs to x before deriving
       ! @mcd: since x is stored in x_tmp then further predicted/corrected with that variable, we only need to do this once
-      IF ( p%DispMode == DispMode_EXTERNAL) THEN
-         CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
-      END IF
+      !IF ( p%DispMode == DispMode_EXTERNAL) THEN
+      !   CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
+      !END IF
       
       ! find xdot at t
       CALL ED_CalcContStateDeriv( t, u_interp, p, x, xd, z, OtherState, m, xdot, ErrStat2, ErrMsg2 )
@@ -9858,9 +9861,9 @@ SUBROUTINE ED_AB4( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat, ErrMsg 
       
       ! @mcd: apply interpolated external inputs to x before deriving
       ! @mcd: since x is stored in x_tmp then further predicted/corrected with that variable, we only need to do this once
-      IF ( p%DispMode == DispMode_EXTERNAL) THEN
-         CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
-      END IF
+      !IF ( p%DispMode == DispMode_EXTERNAL) THEN
+      !   CALL ED_Disp_UpdateStates( u_interp, p, x, ErrStat, ErrMsg)
+      !END IF
       
       CALL ED_CalcContStateDeriv( t, u_interp, p, x, xd, z, OtherState, m, xdot, ErrStat2, ErrMsg2 )
          CALL CheckError(ErrStat2,ErrMsg2)
