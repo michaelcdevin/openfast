@@ -501,45 +501,117 @@ SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, Err
    ! Set the inputs from ElastoDyn and/or BeamDyn:
    !-------------------------------------------------------------------------------------------------
    
-      ! tower
-   IF (u_AD%TowerMotion%Committed) THEN
+      ! @mcd: To create a pseudo-"AD-only" numerical model, overwrite the ElastoDyn outputs with a routine like Set_AD_Inputs from standalone AD.
+      !       This also includes additions that performs simple matrix calculations to account for platform motions changing the tower orientation.
+      !       These are adapted from the CalculatePositions ElastoDyn subroutine.
+   
+   IF (ED%p%DispMode == 2)  THEN   ! BE SURE TO INCLUDE ED_p IN THE PASSED VARIABLES!!!
+       
+      ! Tower motions:
+      DO j=1,AD%u(1)%TowerMotion%nnodes
+          AD%u(1)%TowerMotion%Orientation(  :,:,j) = AD%u(1)%TowerMotion%RefOrientation(:,:,j) ! identity
+          AD%u(1)%TowerMotion%TranslationDisp(:,j) = 0.0_ReKi
+          AD%u(1)%TowerMotion%TranslationVel( :,j) = 0.0_ReKi
+      END DO !j=nnodes
       
-      CALL Transfer_Line2_to_Line2( y_ED%TowerLn2Mesh, u_AD%TowerMotion, MeshMapData%ED_L_2_AD_L_T, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%TowerMotion' )      
+      ! Hub motions:
+      theta(1) = 0.0_ReKi
+      theta(2) = 0.0_ReKi
+      theta(3) = DvrData%Cases(iCase)%Yaw
+      orientation = EulerConstruct(theta)
             
-   END IF
+      AD%u(1)%HubMotion%TranslationDisp(:,1) = matmul( AD%u(1)%HubMotion%Position(:,1), orientation ) - AD%u(1)%HubMotion%Position(:,1) ! = matmul( transpose(orientation) - eye(3), AD%u(1)%HubMotion%Position(:,1) )
+      
+      theta(1) = AD%inputTime(1) * DvrData%Cases(iCase)%RotSpeed
+      theta(2) = 0.0_ReKi
+      theta(3) = 0.0_ReKi
+      AD%u(1)%HubMotion%Orientation(  :,:,1) = matmul( AD%u(1)%HubMotion%RefOrientation(:,:,1), orientation )
+      orientation = EulerConstruct( theta )      
+      AD%u(1)%HubMotion%Orientation(  :,:,1) = matmul( orientation, AD%u(1)%HubMotion%Orientation(  :,:,1) )
+      
+      AD%u(1)%HubMotion%RotationVel(    :,1) = AD%u(1)%HubMotion%Orientation(1,:,1) * DvrData%Cases(iCase)%RotSpeed
+                  
+      ! Blade root motions:
+      DO k=1,DvrData%numBlades         
+         theta(1) = (k-1)*TwoPi/real(DvrData%numBlades,ReKi)
+         theta(2) =  DvrData%precone
+         theta(3) = -DvrData%Cases(iCase)%pitch
+         orientation = EulerConstruct(theta)
+         
+         AD%u(1)%BladeRootMotion(k)%Orientation(  :,:,1) = matmul( orientation, AD%u(1)%HubMotion%Orientation(  :,:,1) )
+         
+      END DO !k=numBlades
+            
+      ! Blade motions:
+      DO k=1,DvrData%numBlades
+         rotateMat = transpose( AD%u(1)%BladeRootMotion(k)%Orientation(  :,:,1) )
+         rotateMat = matmul( rotateMat, AD%u(1)%BladeRootMotion(k)%RefOrientation(  :,:,1) ) 
+         orientation = transpose(rotateMat)
+         
+         rotateMat(1,1) = rotateMat(1,1) - 1.0_ReKi
+         rotateMat(2,2) = rotateMat(2,2) - 1.0_ReKi
+         rotateMat(3,3) = rotateMat(3,3) - 1.0_ReKi
+                  
+         DO j=1,AD%u(1)%BladeMotion(k)%nnodes        
+            position = AD%u(1)%BladeMotion(k)%Position(:,j) - AD%u(1)%HubMotion%Position(:,1) 
+            AD%u(1)%BladeMotion(k)%TranslationDisp(:,j) = AD%u(1)%HubMotion%TranslationDisp(:,1) + matmul( rotateMat, position )
+            
+            AD%u(1)%BladeMotion(k)%Orientation(  :,:,j) = matmul( AD%u(1)%BladeMotion(k)%RefOrientation(:,:,j), orientation )
+            
+            
+            position =  AD%u(1)%BladeMotion(k)%Position(:,j) + AD%u(1)%BladeMotion(k)%TranslationDisp(:,j) &
+                      - AD%u(1)%HubMotion%Position(:,1) - AD%u(1)%HubMotion%TranslationDisp(:,1)
+            AD%u(1)%BladeMotion(k)%TranslationVel( :,j) = cross_product( AD%u(1)%HubMotion%RotationVel(:,1), position )
+
+         END DO !j=nnodes
+                                    
+      END DO !k=numBlades       
+      
+   END IF  ! I-hybrid simulation
+
+   
+   ELSE  ! normal simulation (no hybrid model)
+      ! tower
+      IF (u_AD%TowerMotion%Committed) THEN
+      
+         CALL Transfer_Line2_to_Line2( y_ED%TowerLn2Mesh, u_AD%TowerMotion, MeshMapData%ED_L_2_AD_L_T, ErrStat2, ErrMsg2 )
+            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%TowerMotion' )      
+            
+      END IF
    
       
       ! hub
-   CALL Transfer_Point_to_Point( y_ED%HubPtMotion, u_AD%HubMotion, MeshMapData%ED_P_2_AD_P_H, ErrStat2, ErrMsg2 )
-      CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%HubMotion' )      
+      CALL Transfer_Point_to_Point( y_ED%HubPtMotion, u_AD%HubMotion, MeshMapData%ED_P_2_AD_P_H, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%HubMotion' )      
    
    
       ! blade root   
-   DO k=1,size(y_ED%BladeRootMotion)
-      CALL Transfer_Point_to_Point( y_ED%BladeRootMotion(k), u_AD%BladeRootMotion(k), MeshMapData%ED_P_2_AD_P_R(k), ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeRootMotion('//trim(num2lstr(k))//')' )      
-   END DO
+      DO k=1,size(y_ED%BladeRootMotion)
+         CALL Transfer_Point_to_Point( y_ED%BladeRootMotion(k), u_AD%BladeRootMotion(k), MeshMapData%ED_P_2_AD_P_R(k), ErrStat2, ErrMsg2 )
+            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeRootMotion('//trim(num2lstr(k))//')' )      
+      END DO
       
    
       ! blades
-   IF (p_FAST%CompElast == Module_ED ) THEN
+      IF (p_FAST%CompElast == Module_ED ) THEN
       
-      DO k=1,size(y_ED%BladeLn2Mesh)
-         CALL Transfer_Line2_to_Line2( y_ED%BladeLn2Mesh(k), u_AD%BladeMotion(k), MeshMapData%BDED_L_2_AD_L_B(k), ErrStat2, ErrMsg2 )
-            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeMotion('//trim(num2lstr(k))//')' )   
-      END DO
+         DO k=1,size(y_ED%BladeLn2Mesh)
+            CALL Transfer_Line2_to_Line2( y_ED%BladeLn2Mesh(k), u_AD%BladeMotion(k), MeshMapData%BDED_L_2_AD_L_B(k), ErrStat2, ErrMsg2 )
+               CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeMotion('//trim(num2lstr(k))//')' )   
+         END DO
       
-   ELSEIF (p_FAST%CompElast == Module_BD ) THEN
+      ELSEIF (p_FAST%CompElast == Module_BD ) THEN
       
          ! get them from BeamDyn
-      DO k=1,size(u_AD%BladeMotion)
-         CALL Transfer_Line2_to_Line2( BD%y(k)%BldMotion, u_AD%BladeMotion(k), MeshMapData%BDED_L_2_AD_L_B(k), ErrStat2, ErrMsg2 )
-            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeMotion('//trim(num2lstr(k))//')' )   
-      END DO
+         DO k=1,size(u_AD%BladeMotion)
+            CALL Transfer_Line2_to_Line2( BD%y(k)%BldMotion, u_AD%BladeMotion(k), MeshMapData%BDED_L_2_AD_L_B(k), ErrStat2, ErrMsg2 )
+               CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeMotion('//trim(num2lstr(k))//')' )   
+         END DO
       
             
-   END IF
+      END IF  ! (p_FAST%CompElast == Module_ED )
+      
+   END IF  ! I-normal simulation
 
 
       ! Set Conrol parameter (i.e. flaps) if using ServoDyn
