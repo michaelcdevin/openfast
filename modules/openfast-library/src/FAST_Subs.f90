@@ -3791,7 +3791,6 @@ SUBROUTINE FAST_Solution0(p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, O
       ! the initial ElastoDyn, ServoDyn and IfW/Lidar inputs from Simulink:
    IF ( ED%p%DispMode == 2) THEN
       CALL ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
-      CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x(STATE_CURR), ErrStat2, ErrMsg2)
    END IF
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )   
    IF ( p_FAST%CompInflow == Module_IfW ) CALL IfW_SetExternalInputs( IfW%p, m_FAST, ED%Output(1), IfW%Input(1) )
@@ -4405,7 +4404,6 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
       ! the previous step before we extrapolate these inputs:
    IF ( ED%p%DispMode == 2) THEN
       CALL ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
-      CALL ED_Disp_UpdateStates(ED%Input(1), ED%p, ED%x(STATE_CURR), ErrStat2, ErrMsg2)
    END IF
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )
 

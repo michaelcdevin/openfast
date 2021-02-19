@@ -211,9 +211,9 @@ SUBROUTINE ED_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
       !CALL CalculateLinearVelPAcc(    p, x, m%CoordSys,    m%RtHS ) ! calculate linear velocities and partial accelerations
 
       
-      
       CALL ED_CalcOutput( 0.0_DbKi, u, p, x, xd, z, OtherState, y, m, ErrStat2, ErrMsg2 )
          CALL CheckError( ErrStat2, ErrMsg2 )
+         
    END IF
       
       
@@ -551,11 +551,12 @@ END SUBROUTINE ED_FormatDispInputs
 !! NOTE: no matter how many channels are selected for output, all of the outputs are calculated
 !! All of the calculated output channels are placed into the m\%AllOuts(:), while the channels selected for outputs are
 !! placed in the y\%WriteOutput(:) array.
-SUBROUTINE ED_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
+SUBROUTINE ED_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, u_old )
 !..................................................................................................................................
 
    REAL(DbKi),                   INTENT(IN   )  :: t           !< Current simulation time in seconds
    TYPE(ED_InputType),           INTENT(IN   )  :: u           !< Inputs at Time t
+   TYPE(ED_InputType), OPTIONAL, INTENT(IN   )  :: u_old       !< Inputs at Time t-dt
    TYPE(ED_ParameterType),       INTENT(IN   )  :: p           !< Parameters
    TYPE(ED_ContinuousStateType), INTENT(IN   )  :: x           !< Continuous states at t
    TYPE(ED_DiscreteStateType),   INTENT(IN   )  :: xd          !< Discrete states at t
@@ -624,9 +625,7 @@ SUBROUTINE ED_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
    
    INTEGER(IntKi)               :: ErrStat2                                        ! Temporary Error code
    CHARACTER(ErrMsgLen)         :: ErrMsg2                                         ! Temporary error message
-   
-   REAL(ReKi)                   :: TTDspFA
-   REAL(ReKi)                   :: TTDspSS
+
    
    LOGICAL, PARAMETER           :: UpdateValues  = .TRUE.                          ! determines if the OtherState values need to be updated
    TYPE(ED_ContinuousStateType) :: dxdt                                            ! Continuous state derivs at t
@@ -952,8 +951,6 @@ END IF
    m%AllOuts(YawBrTDyp) = -DOT_PRODUCT(     rOPO, m%CoordSys%b3 )
    m%AllOuts(YawBrTDzp) =  DOT_PRODUCT(     rOPO, m%CoordSys%b2 )
    m%AllOuts(YawBrTDxt) =  DOT_PRODUCT(     rOPO, m%CoordSys%a1 )
-   TTDspFA = DOT_PRODUCT(     rOPO, m%CoordSys%a1 )
-   TTDspSS = -DOT_PRODUCT(     rOPO, m%CoordSys%a3 )
    m%AllOuts(YawBrTDyt) = -DOT_PRODUCT(     rOPO, m%CoordSys%a3 )
    m%AllOuts(YawBrTDzt) =  DOT_PRODUCT(     rOPO, m%CoordSys%a2 )
    m%AllOuts(YawBrTAxp) =  DOT_PRODUCT( LinAccEO, m%CoordSys%b1 )
@@ -1390,9 +1387,13 @@ END IF
    !       IS THERE ANY WAY OF GETTING THIS VELOCITY?<--DO THIS, WHEN YOU ADD THE COUPLED MODE SHAPES!!!!
    
    IF (p%DispMode == DispMode_EXTERNAL) THEN
-       SetCoordSy_hybrid( t, m%CoordSys_hybrid, m%RtHS_hybrid, BlPitch, p, x, ErrStat, ErrMsg ) ! CHECK THESE INPUTS!!!
-       CalculateHybridMotions( p, x, m%CoordSys_hybrid, m%RtHS_hybrid)
-       ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
+      CALL SetCoordSy_hybrid( t, u, m%CoordSys_hybrid, m%RtHS_hybrid, u%BlPitchCom, p, x, ErrStat, ErrMsg )
+       IF (PRESENT(u_old)) THEN
+          CALL CalculateHybridMotions( p, u, x, m%CoordSys_hybrid, m%RtHS_hybrid, p%DT, u_old)
+       ELSE
+          CALL CalculateHybridMotions( p, u, x, m%CoordSys_hybrid, m%RtHS_hybrid)
+       END IF
+       CALL ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
    END IF
        
    
@@ -2228,15 +2229,16 @@ END SUBROUTINE SetCoordSy_hybrid
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine is used to calculate the positions stored in other states that are used in both the
 !! CalcOutput and CalcContStateDeriv routines.
-SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt )
+SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt, u_old)
 !..................................................................................................................................
 
       ! Passed variables
    TYPE(ED_ParameterType),       INTENT(IN   )  :: p           !< Parameters
    TYPE(ED_InputType),           INTENT(IN   )  :: u           !< Inputs at Time
+   TYPE(ED_InputType), OPTIONAL, INTENT(IN   )  :: u_old       !< Inputs at Time t-DT
    TYPE(ED_ContinuousStateType), INTENT(IN   )  :: x           !< Continuous states at Time
    TYPE(ED_CoordSys),            INTENT(IN   )  :: CoordSys    !< The coordinate systems that have been set for these states/time
-   TYPE(ReKi),                   INTENT(IN   )  :: dt          !< Time step
+   REAL(DbKi), OPTIONAL,         INTENT(IN   )  :: dt          !< Time step
    TYPE(ED_RtHndSide),           INTENT(INOUT)  :: RtHSdat     !< data from the RtHndSid module (contains positions to be set)
 
          !Local variables
@@ -2282,6 +2284,8 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt )
    REAL(ReKi)                   :: PtfmPitchVel
    REAL(ReKi)                   :: PtfmYawVel
    
+   REAL(ReKi)                   :: AngVelMat(3)
+   
    REAL(R8Ki)                   :: rK        (3)                                   ! Position vector from inertial frame origin to tail fin center of pressure (point K).
    !REAL(R8Ki)                   :: rQ        (3)                                   ! Position vector from inertial frame origin to apex of rotation (point Q).
    
@@ -2290,8 +2294,28 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt )
    INTEGER(IntKi)               :: K                                               ! Counter for blades
    
    
+   
+! @mcd: allocate velocity terms in place of x%QDT's
+   IF (PRESENT(u_old)) THEN
+      PtfmSurgeVel    =  (u%ExternalPtfmSurge - u_old%ExternalPtfmSurge) / dt
+      PtfmSwayVel     =  (u%ExternalPtfmSway  - u_old%ExternalPtfmSway)  / dt
+      PtfmHeaveVel    =  (u%ExternalPtfmHeave - u_old%ExternalPtfmHeave) / dt
+      PtfmRollVel     =  (u%ExternalPtfmRoll  - u_old%ExternalPtfmRoll)  / dt
+      PtfmPitchVel    =  (u%ExternalPtfmPitch - u_old%ExternalPtfmPitch) / dt
+      PtfmYawVel      =  (u%ExternalPtfmYaw   - u_old%ExternalPtfmYaw)   / dt
+   ELSE
+      PtfmSurgeVel    =  0.0_ReKi
+      PtfmSwayVel     =  0.0_ReKi
+      PtfmHeaveVel    =  0.0_ReKi
+      PtfmRollVel     =  0.0_ReKi
+      PtfmPitchVel    =  0.0_ReKi
+      PtfmYawVel      =  0.0_ReKi
+   END IF
+   
+   AngVelMat   = (/ PtfmRollVel, PtfmPitchVel, PtfmYawVel /)
+   
 ! ---------------------------------------   
-!   CalculatePositions
+!   Parts from CalculatePositions
 ! ---------------------------------------
    
    
@@ -2417,12 +2441,8 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt )
    END DO
    
 ! ---------------------------------------   
-!   CalculateAngularPosVelPAcc
+!   Parts from CalculateAngularPosVelPAcc 
 ! ---------------------------------------
-   
-   PtfmRollVel                     =  (u%ExternalPtfmRoll(1) - u%ExternalPtfmRoll(2)) / dt
-   PtfmPitchVel                    =  (u%ExternalPtfmPitch(1) - u%ExternalPtfmPitch(2)) / dt
-   PtfmYawVel                      =  (u%ExternalPtfmYaw(1) - u%ExternalPtfmYaw(2)) / dt
    
    !-------------------------------------------------------------------------------------------------
    ! Angular and partial angular velocities
@@ -2438,9 +2458,9 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt )
    RtHSdat%AngVelEX                =                     PtfmRollVel*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
                                                        + PtfmPitchVel*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
                                                        + PtfmYawVel*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
-   RtHSdat%AngPosEX                =                     u%ExternalPtfmRoll(1)*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
-                                                       + u%ExternalPtfmPitch(1)*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
-                                                       + u%ExternalPtfmYaw(1)*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
+   RtHSdat%AngPosEX                =                     u%ExternalPtfmRoll*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
+                                                       + u%ExternalPtfmPitch*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
+                                                       + u%ExternalPtfmYaw*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
 
    RtHSdat%PAngVelEB(       :,0,:) =  RtHSdat%PAngVelEX(:,0,:)
    RtHSdat%PAngVelEB(DOF_TFA1,0,:) = -p%TwrFASF(1,p%TTopNode,1)*CoordSys%a3
@@ -2622,14 +2642,8 @@ ENDIF
    END DO ! J
    
 ! ---------------------------------------   
-!   CalculateLinearVelPAcc
+!   Parts from CalculateLinearVelPAcc
 ! --------------------------------------- 
-
-   PtfmSurgeVel = (u%ExternalPtfmSurge(1) - u%ExternalPtfmSurge(2)) / dt
-   PtfmSwayVel  = (u%ExternalPtfmSurge(1) - u%ExternalPtfmSurge(2)) / dt
-   PtfmHeaveVel = (u%ExternalPtfmSurge(1) - u%ExternalPtfmSurge(2)) / dt
-   
-   AngVelMat   = (/ PtfmRollVel, PtfmPitchVel, PtfmYawVel /)
    
          ! Initializations:
 
@@ -2780,9 +2794,9 @@ ENDIF
       RtHSdat%PLinVelEV(PN(I),1,:) = TmpVec1    + TmpVec2 +     RtHSdat%PLinVelEV(PN(I)   ,1,:)
 
       IF (I .le. 3)  THEN
-         LinAccEVt           =  RtHSdat%LinAccEVt + AngVelMat(I) *RtHSdat%PLinVelEV(PN(I)   ,1,:)
+         LinAccEVt           =  LinAccEVt + AngVelMat(I) *RtHSdat%PLinVelEV(PN(I)   ,1,:)
       ELSE
-         LinAccEVt           =  RtHSdat%LinAccEVt + x%QDT(PN(I) )*RtHSdat%PLinVelEV(PN(I)   ,1,:)
+         LinAccEVt           =  LinAccEVt + x%QDT(PN(I) )*RtHSdat%PLinVelEV(PN(I)   ,1,:)
       END IF
 
    ENDDO          ! I - all DOFs associated with the angular motion of the nacelle (body N)
@@ -3152,6 +3166,17 @@ SUBROUTINE ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, E
    INTEGER(IntKi),               INTENT(  OUT)  :: ErrStat     !< Error status of the operation
    CHARACTER(*),                 INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
    
+   
+      ! Local variables
+   INTEGER(IntKi)               :: J, J2                                           ! Loops through nodes / elements
+   INTEGER(IntKi)               :: K                                               ! Loops through blades
+   INTEGER(IntKi)               :: NodeNum                                         ! Mesh node number for given blade/node
+   
+   
+    ! Initialize some output values
+    ErrStat = ErrID_None
+    ErrMsg  = ""
+      
       !...........
    ! Blade elements:
    !...........
@@ -3179,7 +3204,7 @@ SUBROUTINE ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, E
                y%BladeLn2Mesh_hybrid(K)%TranslationDisp(3,NodeNum) =     m%RtHS_hybrid%rS (2,K,J2) + m%RtHS_hybrid%rSAerCen(2,J2,K) + p%PtfmRefzt ! = the distance from the nominal tower base position (i.e., the undeflected position of the tower base) to the current blade aerodynamic center in the zi ( z2) direction
                
                   ! Orientation 
-               y%BladeLn2Mesh_hybrid_hybrid(K)%Orientation(1,1,NodeNum) =     m%CoordSys_hybrid%te1(K,J2,1)
+               y%BladeLn2Mesh_hybrid(K)%Orientation(1,1,NodeNum) =     m%CoordSys_hybrid%te1(K,J2,1)
                y%BladeLn2Mesh_hybrid(K)%Orientation(2,1,NodeNum) =     m%CoordSys_hybrid%te2(K,J2,1)
                y%BladeLn2Mesh_hybrid(K)%Orientation(3,1,NodeNum) =     m%CoordSys_hybrid%te3(K,J2,1)
                y%BladeLn2Mesh_hybrid(K)%Orientation(1,2,NodeNum) = -1.*m%CoordSys_hybrid%te1(K,J2,3)
@@ -5376,8 +5401,15 @@ SUBROUTINE Init_MiscOtherStates( m, OtherState, p, x, InputFileData, ErrStat, Er
 
    CALL Alloc_RtHS( m%RtHS, p, ErrStat, ErrMsg  )
       IF ( ErrStat >= AbortErrLev ) RETURN
-
+      
    CALL Alloc_CoordSys( m%CoordSys, p, ErrStat, ErrMsg )
+      IF ( ErrStat >= AbortErrLev ) RETURN
+      
+      ! @mcd: initialize hybrid types to start the same as the base types   
+   CALL Alloc_RtHS( m%RtHS_hybrid, p, ErrStat, ErrMsg  )
+      IF ( ErrStat >= AbortErrLev ) RETURN
+      
+   CALL Alloc_CoordSys( m%CoordSys_hybrid, p, ErrStat, ErrMsg )
       IF ( ErrStat >= AbortErrLev ) RETURN
    
    CALL AllocAry( m%QD2T, p%NDOF,   'm%QD2T',  ErrStat, ErrMsg )
@@ -10170,6 +10202,12 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
          CALL CheckError( ErrID_Fatal, 'ED: Could not allocate space for y%BladeLn2Mesh{p%NumBl}' )
          RETURN
       END IF
+      
+      ALLOCATE( y%BladeLn2Mesh_hybrid(p%NumBl), Stat=ErrStat2 )
+      IF ( ErrStat2 /= 0 ) THEN
+         CALL CheckError( ErrID_Fatal, 'ED: Could not allocate space for y%BladeLn2Mesh_hybrid{p%NumBl}' )
+         RETURN
+      END IF
    
       DO K = 1,p%NumBl
          
@@ -10186,13 +10224,33 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
                            , ErrMess         = ErrMsg2                )
             CALL CheckError( ErrStat2, ErrMsg2 )
             IF (ErrStat >= AbortErrLev) RETURN
-      
+            
+         CALL MeshCreate( BlankMesh          = y%BladeLn2Mesh_hybrid(K)      &
+                           , NNodes          = p%BldNodes+2           &
+                           , IOS             = COMPONENT_OUTPUT       &
+                           , TranslationDisp = .TRUE.                 &
+                           , Orientation     = .TRUE.                 &
+                           , RotationVel     = .TRUE.                 &
+                           , TranslationVel  = .TRUE.                 &
+                           , RotationAcc     = .TRUE.                 &
+                           , TranslationAcc  = .TRUE.                 &
+                           , ErrStat         = ErrStat2               &
+                           , ErrMess         = ErrMsg2                )
+            CALL CheckError( ErrStat2, ErrMsg2 )
+            IF (ErrStat >= AbortErrLev) RETURN
+            
+            
          DO J = 1,p%BldNodes               
             CALL MeshPositionNode ( y%BladeLn2Mesh(K), J, u%BladePtLoads(K)%Position(:,J), ErrStat2, ErrMsg2, Orient=u%BladePtLoads(K)%RefOrientation(:,:,J) )
                CALL CheckError( ErrStat2, ErrMsg2 )
                IF (ErrStat >= AbortErrLev) RETURN
+               
+            CALL MeshPositionNode ( y%BladeLn2Mesh_hybrid(K), J, u%BladePtLoads(K)%Position(:,J), ErrStat2, ErrMsg2, Orient=u%BladePtLoads(K)%RefOrientation(:,:,J) )
+               CALL CheckError( ErrStat2, ErrMsg2 )
+               IF (ErrStat >= AbortErrLev) RETURN
          END DO
             
+      
             ! now add position/orientation of nodes for AD14 or AD15
          if (p%UseAD14) then     ! position/orientation of nodes for AeroDyn v14 or v15    
          
@@ -10235,7 +10293,11 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
                CALL MeshPositionNode ( y%BladeLn2Mesh(K), NodeNum, position, ErrStat2, ErrMsg2, Orient=Orientation )
                   CALL CheckError( ErrStat2, ErrMsg2 )
                   IF (ErrStat >= AbortErrLev) RETURN
-                                    
+               
+               CALL MeshPositionNode ( y%BladeLn2Mesh_hybrid(K), NodeNum, position, ErrStat2, ErrMsg2, Orient=Orientation )
+                  CALL CheckError( ErrStat2, ErrMsg2 )
+                  IF (ErrStat >= AbortErrLev) RETURN
+                  
             END DO ! nodes 
             
          end if ! position/orientation of nodes for AeroDyn v14 or v15
@@ -10244,6 +10306,15 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
          DO J = 2,p%TipNode !p%BldNodes + 1
             
             CALL MeshConstructElement ( Mesh      = y%BladeLn2Mesh(K)  &
+                                       , Xelement = ELEMENT_LINE2      &
+                                       , P1       = J-1                &   ! node1 number
+                                       , P2       = J                  &   ! node2 number
+                                       , ErrStat  = ErrStat2           &
+                                       , ErrMess  = ErrMsg2            )
+               CALL CheckError( ErrStat2, ErrMsg2 )
+               IF (ErrStat >= AbortErrLev) RETURN
+               
+            CALL MeshConstructElement ( Mesh      = y%BladeLn2Mesh_hybrid(K)  &
                                        , Xelement = ELEMENT_LINE2      &
                                        , P1       = J-1                &   ! node1 number
                                        , P2       = J                  &   ! node2 number
@@ -10265,11 +10336,24 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
             IF (ErrStat >= AbortErrLev) RETURN
       
          
+         CALL MeshConstructElement ( Mesh      = y%BladeLn2Mesh_hybrid(K)  &
+                                    , Xelement = ELEMENT_LINE2      &
+                                    , P1       = p%BldNodes + 2     &   ! node1 number (extra node at root)
+                                    , P2       = 1                  &   ! node2 number (first node on blade)
+                                    , ErrStat  = ErrStat2           &
+                                    , ErrMess  = ErrMsg2            )         
+            CALL CheckError( ErrStat2, ErrMsg2 )
+            IF (ErrStat >= AbortErrLev) RETURN
+            
             ! that's our entire mesh:
          CALL MeshCommit ( y%BladeLn2Mesh(K), ErrStat2, ErrMsg2 )   
             CALL CheckError( ErrStat2, ErrMsg2 )
             IF (ErrStat >= AbortErrLev) RETURN
    
+         CALL MeshCommit ( y%BladeLn2Mesh_hybrid(K), ErrStat2, ErrMsg2 )   
+            CALL CheckError( ErrStat2, ErrMsg2 )
+            IF (ErrStat >= AbortErrLev) RETURN
+            
       END DO
       
    END IF
@@ -10313,6 +10397,20 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
                     , ErrMess         = ErrMsg2          )
          CALL CheckError(ErrStat2,ErrMsg2)
          IF (ErrStat >= AbortErrLev) RETURN
+         
+   CALL MeshCreate( BlankMesh = y%TowerLn2Mesh_hybrid    &
+                    , IOS             = COMPONENT_OUTPUT &
+                    , NNodes          = p%TwrNodes + 2   &
+                    , TranslationDisp = .TRUE.           &
+                    , Orientation     = .TRUE.           &
+                    , RotationVel     = .TRUE.           &
+                    , TranslationVel  = .TRUE.           &  
+                    , RotationAcc     = .TRUE.           &  
+                    , TranslationAcc  = .TRUE.           &
+                    , ErrStat         = ErrStat2         &
+                    , ErrMess         = ErrMsg2          )
+         CALL CheckError(ErrStat2,ErrMsg2)
+         IF (ErrStat >= AbortErrLev) RETURN
    
       ! position the nodes on the tower:
       DO J = 1,p%TwrNodes      
@@ -10320,6 +10418,12 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
                                  orient = u%TowerPtLoads%RefOrientation(:,:,J) )
             CALL CheckError(ErrStat2,ErrMsg2)
             IF (ErrStat >= AbortErrLev) RETURN
+            
+         CALL MeshPositionNode ( y%TowerLn2Mesh_hybrid, J, u%TowerPtLoads%Position(:,J), ErrStat2, ErrMsg2, &
+                                 orient = u%TowerPtLoads%RefOrientation(:,:,J) )
+            CALL CheckError(ErrStat2,ErrMsg2)
+            IF (ErrStat >= AbortErrLev) RETURN
+            
       END DO
 
    ! for now, we're going to add two nodes, one at the beginning and the other at the end
@@ -10329,7 +10433,15 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
          CALL CheckError(ErrStat2,ErrMsg2)
          IF (ErrStat >= AbortErrLev) RETURN
          
+      CALL MeshPositionNode ( y%TowerLn2Mesh_hybrid, p%TwrNodes + 1, (/0.0_ReKi, 0.0_ReKi, p%TowerHt /), ErrStat2, ErrMsg2 ) 
+         CALL CheckError(ErrStat2,ErrMsg2)
+         IF (ErrStat >= AbortErrLev) RETURN
+         
       CALL MeshPositionNode ( y%TowerLn2Mesh, p%TwrNodes + 2, (/0.0_ReKi, 0.0_ReKi, p%TowerBsHt  /), ErrStat2, ErrMsg2 )
+         CALL CheckError(ErrStat2,ErrMsg2)
+         IF (ErrStat >= AbortErrLev) RETURN
+         
+      CALL MeshPositionNode ( y%TowerLn2Mesh_hybrid, p%TwrNodes + 2, (/0.0_ReKi, 0.0_ReKi, p%TowerBsHt  /), ErrStat2, ErrMsg2 )
          CALL CheckError(ErrStat2,ErrMsg2)
          IF (ErrStat >= AbortErrLev) RETURN
 
@@ -10345,6 +10457,17 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
          
          CALL CheckError(ErrStat2,ErrMsg2)
          IF (ErrStat >= AbortErrLev) RETURN
+         
+         CALL MeshConstructElement ( Mesh      = y%TowerLn2Mesh_hybrid     &
+                                    , Xelement = ELEMENT_LINE2      &
+                                    , P1       = J-1                &   ! node1 number
+                                    , P2       = J                  &   ! node2 number
+                                    , ErrStat  = ErrStat2           &
+                                    , ErrMess  = ErrMsg2            )
+         
+         CALL CheckError(ErrStat2,ErrMsg2)
+         IF (ErrStat >= AbortErrLev) RETURN
+         
       END DO
       
    ! add the other extra element, connecting the first node:
@@ -10357,10 +10480,25 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
          
       CALL CheckError(ErrStat2,ErrMsg2)
       IF (ErrStat >= AbortErrLev) RETURN
+      
+      CALL MeshConstructElement ( Mesh      = y%TowerLn2Mesh_hybrid     &
+                                 , Xelement = ELEMENT_LINE2      &
+                                 , P1       = p%TwrNodes + 2     &   ! node1 number
+                                 , P2       = 1                  &   ! node2 number
+                                 , ErrStat  = ErrStat2           &
+                                 , ErrMess  = ErrMsg2            )
+         
+      CALL CheckError(ErrStat2,ErrMsg2)
+      IF (ErrStat >= AbortErrLev) RETURN
+      
                                           
    
       ! that's our entire mesh:
    CALL MeshCommit ( y%TowerLn2Mesh, ErrStat2, ErrMsg2 )   
+      CALL CheckError(ErrStat2,ErrMsg2)
+      IF (ErrStat >= AbortErrLev) RETURN
+      
+   CALL MeshCommit ( y%TowerLn2Mesh_hybrid, ErrStat2, ErrMsg2 )   
       CALL CheckError(ErrStat2,ErrMsg2)
       IF (ErrStat >= AbortErrLev) RETURN
                                                           
@@ -10381,6 +10519,20 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
                      ,ErrMess          = ErrMsg2          )
       CALL CheckError(ErrStat2,ErrMsg2)
       IF (ErrStat >= AbortErrLev) RETURN
+      
+   CALL MeshCopy (     SrcMesh  = y%HubPtMotion           &
+                     , DestMesh = y%HubPtMotion_hybrid    &
+                     , CtrlCode = MESH_NEWCOPY            &
+                     , IOS      = COMPONENT_OUTPUT        &      
+                     , TranslationDisp = .TRUE.           &
+                     , Orientation     = .TRUE.           &
+                     , RotationVel     = .TRUE.           &
+                     ,ErrStat          = ErrStat2         &
+                     ,ErrMess          = ErrMsg2          )
+      CALL CheckError(ErrStat2,ErrMsg2)
+      IF (ErrStat >= AbortErrLev) RETURN
+      
+
       
    ! -------------- pseudo-Hub (for AD v14)  -----------------------------------
    CALL MeshCreate( BlankMesh          = y%HubPtMotion14  &
@@ -10411,9 +10563,28 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
       RETURN
    END IF
                   
-      
+   ALLOCATE( y%BladeRootMotion_hybrid(p%NumBl), Stat=ErrStat2 )
+   IF ( ErrStat2 /= 0 ) THEN
+      CALL CheckError( ErrID_Fatal, 'ED: Could not allocate space for y%BladeRootMotions{p%NumBl}' )
+      RETURN
+   END IF
+   
    DO k=1,p%NumBl      
       CALL MeshCreate( BlankMesh       = y%BladeRootMotion(k)   &
+                     ,IOS              = COMPONENT_OUTPUT       &
+                     ,NNodes           = 1                      &
+                     ,TranslationDisp  = .TRUE.                 & 
+                     ,Orientation      = .TRUE.                 & 
+                     ,TranslationVel   = .TRUE.                 & 
+                     ,TranslationAcc   = .TRUE.                 & 
+                     ,RotationVel      = .TRUE.                 & 
+                     ,RotationAcc      = .TRUE.                 & 
+                     ,ErrStat          = ErrStat2               &
+                     ,ErrMess          = ErrMsg2                )
+         CALL CheckError(ErrStat2,ErrMsg2)
+         IF (ErrStat >= AbortErrLev) RETURN            
+         
+      CALL MeshCreate( BlankMesh       = y%BladeRootMotion_hybrid(k)   &
                      ,IOS              = COMPONENT_OUTPUT       &
                      ,NNodes           = 1                      &
                      ,TranslationDisp  = .TRUE.                 & 
@@ -10482,6 +10653,11 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
          CALL CheckError(ErrStat2,ErrMsg2)
          IF (ErrStat >= AbortErrLev) RETURN
          
+      CALL MeshPositionNode ( y%BladeRootMotion_hybrid(K), 1, Position, &
+                            ErrStat, ErrMsg, Orient=Orientation ) 
+         CALL CheckError(ErrStat2,ErrMsg2)
+         IF (ErrStat >= AbortErrLev) RETURN
+         
    END DO
                      
    CALL CommitPointMesh( y%BladeRootMotion14 )
@@ -10489,6 +10665,9 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
    
    DO k=1,p%NumBl      
       CALL CommitPointMesh( y%BladeRootMotion(K) )
+         IF (ErrStat >= AbortErrLev) RETURN
+         
+      CALL CommitPointMesh( y%BladeRootMotion_hybrid(K) )
          IF (ErrStat >= AbortErrLev) RETURN
    END DO
    
@@ -12162,7 +12341,7 @@ SUBROUTINE ED_JacobianPInput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrM
          call ED_Perturb_u( p, i, 1, u_perturb, delta )
 
             ! compute y at u_op + delta u
-         call ED_CalcOutput( t, u_perturb, p, x, xd, z, OtherState, y_p, m, ErrStat2, ErrMsg2 ) 
+         call ED_CalcOutput( t, u_perturb, p, x, xd, z, OtherState, y_p, m, ErrStat2, ErrMsg2 )
             call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName) ! we shouldn't have any errors about allocating memory here so I'm not going to return-on-error until later            
          
             
@@ -12172,7 +12351,7 @@ SUBROUTINE ED_JacobianPInput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrM
          call ED_Perturb_u( p, i, -1, u_perturb, delta )
          
             ! compute y at u_op - delta u
-         call ED_CalcOutput( t, u_perturb, p, x, xd, z, OtherState, y_m, m, ErrStat2, ErrMsg2 ) 
+         call ED_CalcOutput( t, u_perturb, p, x, xd, z, OtherState, y_m, m, ErrStat2, ErrMsg2 )
             call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName) ! we shouldn't have any errors about allocating memory here so I'm not going to return-on-error until later            
          
             
@@ -12383,7 +12562,7 @@ SUBROUTINE ED_JacobianPContState( t, u, p, x, xd, z, OtherState, y, m, ErrStat, 
          call ED_Perturb_x( p, i, 1, x_perturb, delta )
 
             ! compute y at x_op + delta x
-         call ED_CalcOutput( t, u, p, x_perturb, xd, z, OtherState, y_p, m, ErrStat2, ErrMsg2 ) 
+         call ED_CalcOutput( t, u, p, x_perturb, xd, z, OtherState, y_p, m, ErrStat2, ErrMsg2 )
             call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName) ! we shouldn't have any errors about allocating memory here so I'm not going to return-on-error until later            
          
             
@@ -12393,7 +12572,7 @@ SUBROUTINE ED_JacobianPContState( t, u, p, x, xd, z, OtherState, y, m, ErrStat, 
          call ED_Perturb_x( p, i, -1, x_perturb, delta )
          
             ! compute y at x_op - delta x
-         call ED_CalcOutput( t, u, p, x_perturb, xd, z, OtherState, y_m, m, ErrStat2, ErrMsg2 ) 
+         call ED_CalcOutput( t, u, p, x_perturb, xd, z, OtherState, y_m, m, ErrStat2, ErrMsg2 )
             call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName) ! we shouldn't have any errors about allocating memory here so I'm not going to return-on-error until later            
          
             
