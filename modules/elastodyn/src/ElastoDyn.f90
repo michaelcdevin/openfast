@@ -1947,7 +1947,7 @@ SUBROUTINE SetCoordSy_hybrid( t, u, CoordSys, RtHSdat, BlPitch, p, x, ErrStat, E
 
       ! Tower base / platform coordinate system:
 
-   CALL SmllRotTrans( 'platform displacement (ElastoDyn SetCoordSy)', u%ExternalPtfmRoll, u%ExternalPtfmYaw, -u%ExternalPtfmPitch, TransMat, TRIM(Num2LStr(t))//' s', ErrStat2, ErrMsg2 )  ! Get the transformation matrix, TransMat, from inertial frame to tower base / platform coordinate systems.
+   CALL SmllRotTrans( 'platform displacement (ElastoDyn SetCoordSy)', u%ExternalPtfmRoll*D2R, u%ExternalPtfmYaw*D2R, -u%ExternalPtfmPitch*D2R, TransMat, TRIM(Num2LStr(t))//' s', ErrStat2, ErrMsg2 )  ! Get the transformation matrix, TransMat, from inertial frame to tower base / platform coordinate systems.
       CALL CheckError( ErrStat2, ErrMsg2 )
       IF (ErrStat >= AbortErrLev) RETURN
 
@@ -2297,12 +2297,12 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt, u_old)
    
 ! @mcd: allocate velocity terms in place of x%QDT's
    IF (PRESENT(u_old)) THEN
-      PtfmSurgeVel    =  (u%ExternalPtfmSurge - u_old%ExternalPtfmSurge) / dt
-      PtfmSwayVel     =  (u%ExternalPtfmSway  - u_old%ExternalPtfmSway)  / dt
-      PtfmHeaveVel    =  (u%ExternalPtfmHeave - u_old%ExternalPtfmHeave) / dt
-      PtfmRollVel     =  (u%ExternalPtfmRoll  - u_old%ExternalPtfmRoll)  / dt
-      PtfmPitchVel    =  (u%ExternalPtfmPitch - u_old%ExternalPtfmPitch) / dt
-      PtfmYawVel      =  (u%ExternalPtfmYaw   - u_old%ExternalPtfmYaw)   / dt
+      PtfmSurgeVel    =  (u%ExternalPtfmSurge     - u_old%ExternalPtfmSurge) / dt
+      PtfmSwayVel     =  (u%ExternalPtfmSway      - u_old%ExternalPtfmSway)  / dt
+      PtfmHeaveVel    =  (u%ExternalPtfmHeave     - u_old%ExternalPtfmHeave) / dt
+      PtfmRollVel     =  (u%ExternalPtfmRoll*D2R  - u_old%ExternalPtfmRoll*D2R)  / dt
+      PtfmPitchVel    =  (u%ExternalPtfmPitch*D2R - u_old%ExternalPtfmPitch*D2R) / dt
+      PtfmYawVel      =  (u%ExternalPtfmYaw*D2R   - u_old%ExternalPtfmYaw*D2R)   / dt
    ELSE
       PtfmSurgeVel    =  0.0_ReKi
       PtfmSwayVel     =  0.0_ReKi
@@ -2458,9 +2458,9 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt, u_old)
    RtHSdat%AngVelEX                =                     PtfmRollVel*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
                                                        + PtfmPitchVel*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
                                                        + PtfmYawVel*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
-   RtHSdat%AngPosEX                =                     u%ExternalPtfmRoll*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
-                                                       + u%ExternalPtfmPitch*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
-                                                       + u%ExternalPtfmYaw*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
+   RtHSdat%AngPosEX                =                     u%ExternalPtfmRoll*D2R*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
+                                                       + u%ExternalPtfmPitch*D2R*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
+                                                       + u%ExternalPtfmYaw*D2R*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
 
    RtHSdat%PAngVelEB(       :,0,:) =  RtHSdat%PAngVelEX(:,0,:)
    RtHSdat%PAngVelEB(DOF_TFA1,0,:) = -p%TwrFASF(1,p%TTopNode,1)*CoordSys%a3
