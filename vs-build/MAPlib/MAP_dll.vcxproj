@@ -53,9 +53,9 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_Hybrid|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -120,8 +120,9 @@
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\build\bin\</OutDir>
     <TargetName>MAP_$(PlatformName)</TargetName>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\..\modules\map\src</IncludePath>
-    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\..\modules\map\src;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\include\ia32;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\include</IncludePath>
+    <LibraryPath>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\lib\ia32_win;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\lib;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>MAP_$(PlatformName)</TargetName>
@@ -134,8 +135,8 @@
     <TargetName>MAP_$(PlatformName)</TargetName>
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\build\bin\</OutDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\..\modules\map\src</IncludePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\..\modules\map\src;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\include\intel64;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\include</IncludePath>
+    <LibraryPath>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\lib\intel64_win;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\lib;$(VC_LibraryPath_x86);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -201,6 +202,14 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <Lib>
+      <AdditionalDependencies>mkl_intel_c.lib;mkl_sequential.lib;mkl_core.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\lib\ia32_win</AdditionalLibraryDirectories>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -239,6 +248,10 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019.4.245\windows\mkl\lib\intel64_win</AdditionalLibraryDirectories>
+      <AdditionalDependencies>mkl_intel_lp64.lib;mkl_sequential.lib;mkl_core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\modules\map\src\bstring\bstraux.c" />

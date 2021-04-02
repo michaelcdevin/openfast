@@ -27,10 +27,14 @@
  * its associated macro definitions.
  */
 #include "simstruc.h"
-#include "mex.h"     // for mexPutVariable
-#include "matrix.h"  // for mxCreateDoubleScalar
 #include "FAST_Library.h"
 #include <math.h>
+
+#ifdef MATLAB_MEX_FILE  // @mcd: these header files are not allowed for code generation / Simulink-RT
+#include "mex.h"     // for mexPutVariable
+#include "matrix.h"  // for mxCreateDoubleScalar
+#endif
+
 #define min(a,b) fmin(a,b)
 
 
@@ -142,9 +146,12 @@ static void mdlInitializeSizes(SimStruct *S)
    //static char OutList[MAXIMUM_OUTPUTS][CHANNEL_LENGTH + 1];
    static char OutList[CHANNEL_LENGTH + 1];
    double *AdditionalInitInputs;
+
+   #ifdef MATLAB_MEX_FILE
    mxArray *pm, *chrAry;
    mwSize m, n;
    mwIndex indx;
+   #endif
 
    if (n_t_global == -2) {
 
@@ -205,6 +212,8 @@ static void mdlInitializeSizes(SimStruct *S)
 
 
        // set DT in the Matlab workspace (necessary for Simulink block solver options)
+	   // @mcd: this functionality isn't supported in code genertaion/Simulink-RT and is only done if used as a MEX file
+       #ifdef MATLAB_MEX_FILE
        pm = mxCreateDoubleScalar(dt);
        ErrStat = mexPutVariable("base", "DT", pm);
        mxDestroyArray(pm);
@@ -257,6 +266,7 @@ static void mdlInitializeSizes(SimStruct *S)
           checkError(S);
           return;
        }
+       #endif
        //  ---------------------------------------------  
     
 

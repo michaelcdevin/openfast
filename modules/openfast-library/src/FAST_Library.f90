@@ -380,7 +380,7 @@ end subroutine FAST_End
 subroutine FAST_CreateCheckpoint(iTurb, CheckpointRootName_c, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAST_CreateCheckpoint')
    IMPLICIT NONE
 #ifndef IMPLICIT_DLLEXPORT
-!DEC$ ATTRIBUTES DLLEXPORT :: FAST_CreateCheckpoint
+ha!DEC$ ATTRIBUTES DLLEXPORT :: FAST_CreateCheckpoint
 !GCC$ ATTRIBUTES DLLEXPORT :: FAST_CreateCheckpoint
 #endif
    INTEGER(C_INT),         INTENT(IN   ) :: iTurb            ! Turbine number 
