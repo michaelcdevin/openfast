@@ -3168,6 +3168,7 @@ SUBROUTINE ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, E
    
    
       ! Local variables
+   REAL(DbKi)  :: tt_disp
    INTEGER(IntKi)               :: J, J2                                           ! Loops through nodes / elements
    INTEGER(IntKi)               :: K                                               ! Loops through blades
    INTEGER(IntKi)               :: NodeNum                                         ! Mesh node number for given blade/node
@@ -3344,6 +3345,7 @@ SUBROUTINE ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, E
    J = p%TwrNodes+1
    
    y%TowerLn2Mesh_hybrid%TranslationDisp(1,J) =     m%RtHS_hybrid%rO(1) - y%TowerLn2Mesh_hybrid%Position(1,J)
+   tt_disp = y%TowerLn2Mesh_hybrid%TranslationDisp(1,J)
    y%TowerLn2Mesh_hybrid%TranslationDisp(2,J) = -1.*m%RtHS_hybrid%rO(3) - y%TowerLn2Mesh_hybrid%Position(2,J)
    y%TowerLn2Mesh_hybrid%TranslationDisp(3,J) =     m%RtHS_hybrid%rO(2) - y%TowerLn2Mesh_hybrid%Position(3,J) + p%PtfmRefzt
    

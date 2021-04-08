@@ -527,7 +527,7 @@ SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, Dis
    
    
       ! blade root   
-      DO k=1,size(y_ED%BladeRootMotion)
+      DO k=1,size(y_ED%BladeRootMotion_hybrid)
          CALL Transfer_Point_to_Point( y_ED%BladeRootMotion_hybrid(k), u_AD%BladeRootMotion(k), MeshMapData%ED_P_2_AD_P_R(k), ErrStat2, ErrMsg2 )
             CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeRootMotion('//trim(num2lstr(k))//')' )      
       END DO
@@ -536,7 +536,7 @@ SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, Dis
       ! blades
       IF (p_FAST%CompElast == Module_ED ) THEN
       
-         DO k=1,size(y_ED%BladeLn2Mesh)
+         DO k=1,size(y_ED%BladeLn2Mesh_hybrid)
             CALL Transfer_Line2_to_Line2( y_ED%BladeLn2Mesh_hybrid(k), u_AD%BladeMotion(k), MeshMapData%BDED_L_2_AD_L_B(k), ErrStat2, ErrMsg2 )
                CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeMotion('//trim(num2lstr(k))//')' )   
          END DO
