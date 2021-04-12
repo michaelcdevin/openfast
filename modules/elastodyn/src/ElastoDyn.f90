@@ -47,7 +47,7 @@ MODULE ElastoDyn
                                                !   continuous states, and updating discrete states
    PUBLIC :: ED_Disp_UpdateStates              ! Routine to transfer displacement inputs from an external source (Simulink)
                                                !   to the continuous states to be updated via the normal loose coupling routine
-   PUBLIC :: ED_FormatDispInputs               ! Routine to separate external displacements from the inputs
+   PUBLIC :: ED_FormatExternalInputs           ! Routine to separate external displacements and velocities from the inputs
    PUBLIC :: ED_CalcOutput                     ! Routine for computing outputs
 
    PUBLIC :: ED_CalcConstrStateResidual        ! Tight coupling routine for returning the constraint state residual
@@ -462,18 +462,24 @@ END SUBROUTINE ED_UpdateStates
 !> Routine to transfer displacement inputs from an external source (Simulink) to the continuous states to be updated via the normal
 !! loose coupling routine (ED_UpdateStates). This is called as to not directly write inputs to continuous states, as I believe
 !! this breaks the FAST framework.
-SUBROUTINE ED_Disp_UpdateStates( u, p, x, ErrStat, ErrMsg )
+SUBROUTINE ED_Disp_UpdateStates( u, u_old, dt, p, x, ErrStat, ErrMsg )
 !..................................................................................................................................
 
-      TYPE(ED_InputType),                 INTENT(IN   ) :: u          !< Inputs
+      TYPE(ED_InputType),                 INTENT(IN   ) :: u          !< Inputs at t
+      TYPE(ED_InputType),                 INTENT(IN   ) :: u_old      !< Inputs at t-dt
+      REAL(DbKi),                         INTENT(IN   ) :: dt         !< Time increment
       TYPE(ED_ParameterType),             INTENT(IN   ) :: p          !< Parameters
       TYPE(ED_ContinuousStateType),       INTENT(INOUT) :: x          !< Continuous states
       INTEGER(IntKi),                     INTENT(  OUT) :: ErrStat    !< Error status of the operation
       CHARACTER(*),                       INTENT(  OUT) :: ErrMsg     !< Error message if ErrStat /= ErrID_None
 
             ! Local variables:
-      REAL(ReKi)         :: PtfmDisplacement(6)  !< Six DOFs of platform displacement (in order: surge, sway, heave, pitch, roll, yaw)
-      REAL(ReKi)         :: TTDisplacement(2)    !< Two DOFs of tower top displacement (in order: fore-aft, side-side)
+      REAL(ReKi)            :: PtfmDisplacement(6)  !< Six DOFs of platform displacement
+      REAL(ReKi)            :: PtfmVelocity(6)      !< Six DOFs of platform velocity using backwards differencing
+                                                                                !!   in order: surge, sway, heave, roll, pitch, yaw
+      REAL(ReKi)            :: TTDisplacement(2)    !< Two DOFs of tower top displacement
+      REAL(ReKi)            :: TTVelocity(2)        !< Two DOFs of tower top velocity using backwards differencing
+                                                                                !!   in order: fore-aft, side-side
       
          ! Initialize ErrStat
 
@@ -481,68 +487,92 @@ SUBROUTINE ED_Disp_UpdateStates( u, p, x, ErrStat, ErrMsg )
       ErrMsg  = ""     
       
          ! Extract and format displacement values from external inputs (Simulink)
-      CALL ED_FormatDispInputs( u, PtfmDisplacement, TTDisplacement )
+      CALL ED_FormatExternalInputs( u, u_old, dt, PtfmDisplacement, PtfmVelocity, TTDisplacement, TTVelocity )
       
          ! Apply displacement values to continuous state variables if DOFs are enabled
       IF ( p%DOF_Flag(DOF_Sg) )  THEN
-          x%QT( DOF_Sg ) = PtfmDisplacement(1)      ! Platform surge
+         x%QT(  DOF_Sg  ) = PtfmDisplacement(1)     ! Platform surge
+         x%QDT( DOF_Sg  ) = PtfmVelocity(1)
       ENDIF
       
       IF ( p%DOF_Flag(DOF_Sw) )  THEN
-          x%QT( DOF_Sw ) = PtfmDisplacement(2)      ! Platform sway
+         x%QT(  DOF_Sw  ) = PtfmDisplacement(2)     ! Platform sway
+         x%QDT( DOF_Sw  ) = PtfmVelocity(2)
       ENDIF
       
       IF ( p%DOF_Flag(DOF_Hv) )  THEN
-          x%QT( DOF_Hv ) = PtfmDisplacement(3)      ! Platform heave
-      ENDIF
-      
-      IF ( p%DOF_Flag(DOF_P) )  THEN
-          x%QT( DOF_P ) = PtfmDisplacement(4)*D2R   ! Platform pitch
+         x%QT(  DOF_Hv  ) = PtfmDisplacement(3)     ! Platform heave
+         x%QDT( DOF_Hv  ) = PtfmVelocity(3)
       ENDIF
       
       IF ( p%DOF_Flag(DOF_R) )  THEN
-          x%QT( DOF_R ) = PtfmDisplacement(5)*D2R   ! Platform roll
+         x%QT(  DOF_R   ) = PtfmDisplacement(4)     ! Platform roll
+         x%QDT( DOF_R   ) = PtfmVelocity(4)
+      ENDIF
+            
+      IF ( p%DOF_Flag(DOF_P) )  THEN
+         x%QT(  DOF_P   ) = PtfmDisplacement(5)     ! Platform pitch
+         x%QDT( DOF_P   ) = PtfmVelocity(5)
       ENDIF
       
       IF ( p%DOF_Flag(DOF_Y) )  THEN
-          x%QT( DOF_Y ) = PtfmDisplacement(6)*D2R   ! Platform yaw
+         x%QT(  DOF_Y   ) = PtfmDisplacement(6)     ! Platform yaw
+         x%QDT( DOF_Y   ) = PtfmVelocity(6)
       ENDIF
       
       IF ( p%DOF_Flag(DOF_TFA1) )  THEN             ! First fore-aft tower mode is enabled.
-        x%QT(DOF_TFA1) =  TTDisplacement(1)
+         x%QT(  DOF_TFA1) = TTDisplacement(1)
+         x%QDT( DOF_TFA1) = TTVelocity(1)
       ELSEIF( p%DOF_Flag(DOF_TFA2) )  THEN          ! Second fore-aft tower mode is enabled, but first is not.
-        x%QT(DOF_TFA2) =  TTDisplacement(1)
+         x%QT(  DOF_TFA2) = TTDisplacement(1)
+         x%QDT( DOF_TFA2) = TTVelocity(1)
       ENDIF
 
       IF ( p%DOF_Flag(DOF_TSS1 ) )  THEN            ! First side-to-side tower mode is enabled.
-        x%QT(DOF_TSS1) = -TTDisplacement(2)
+         x%QT(  DOF_TSS1) = TTDisplacement(2)
+         x%QDT( DOF_TSS1) = TTVelocity(2)
       ELSEIF( p%DOF_Flag(DOF_TSS2) )  THEN          ! Second side-to-side tower mode is enabled, but first is not.
-        x%QT(DOF_TSS2) = -TTDisplacement(2)
+         x%QT(  DOF_TSS2) = TTDisplacement(2)
+         x%QDT( DOF_TSS2) = TTVelocity(2)
       ENDIF
 
 END SUBROUTINE ED_Disp_UpdateStates
 !----------------------------------------------------------------------------------------------------------------------------------
-!> Routine for extracting and formatting displacement inputs from an external source (Simulink)
-SUBROUTINE ED_FormatDispInputs( u, PtfmDisplacement, TTDisplacement)
+!> Routine for extracting and formatting displacement and velocity inputs from hybrid model displacement inputs (via Simulink)
+SUBROUTINE ED_FormatExternalInputs( u, u_old, dt, PtfmDisplacement, PtfmVelocity, TTDisplacement, TTVelocity)
 !..................................................................................................................................
     
       TYPE(ED_InputType),              INTENT(IN   ) :: u                    !< Inputs at t
+      TYPE(ED_InputType),              INTENT(IN   ) :: u_old                !< Inputs at t-dt
+      REAL(DbKi),                      INTENT(IN   ) :: dt                   !< Time increment
       REAL(ReKi),                      INTENT(  OUT) :: PtfmDisplacement(6)  !< Six DOFs of platform displacement
-                                                                             !!   in order: surge, sway, heave, pitch, roll, yaw
-      REAL(ReKi),                      INTENT(  OUT) :: TTDisplacement(2)    !< Two DOFs of tower top displacment
-                                                                             !!   in order: fore-aft, side-side
+      REAL(ReKi),                      INTENT(  OUT) :: PtfmVelocity(6)      !< Six DOFs of platform velocity using backwards differencing
+                                                                                !!   in order: surge, sway, heave, roll, pitch, yaw
+      REAL(ReKi),                      INTENT(  OUT) :: TTDisplacement(2)    !< Two DOFs of tower top displacement
+      REAL(ReKi),                      INTENT(  OUT) :: TTVelocity(2)        !< Two DOFs of tower top velocity using backwards differencing
+                                                                                !!   in order: fore-aft, side-side
       
-      PtfmDisplacement(1)   = u%ExternalPtfmSurge
-      PtfmDisplacement(2)   = u%ExternalPtfmSway
-      PtfmDisplacement(3)   = u%ExternalPtfmHeave
-      PtfmDisplacement(4)   = u%ExternalPtfmPitch
-      PtfmDisplacement(5)   = u%ExternalPtfmRoll
-      PtfmDisplacement(6)   = u%ExternalPtfmYaw
+      PtfmDisplacement(1)  =  u%ExternalPtfmSurge
+      PtfmDisplacement(2)  =  u%ExternalPtfmSway
+      PtfmDisplacement(3)  =  u%ExternalPtfmHeave
+      PtfmDisplacement(4)  =  u%ExternalPtfmRoll*D2R
+      PtfmDisplacement(5)  =  u%ExternalPtfmPitch*D2R
+      PtfmDisplacement(6)  =  u%ExternalPtfmYaw*D2R
       
-      TTDisplacement(1)     = u%ExternalTTDspFA
-      TTDisplacement(2)     = u%ExternalTTDspSS
+      PtfmVelocity(1)      = (u%ExternalPtfmSurge     - u_old%ExternalPtfmSurge) / dt
+      PtfmVelocity(2)      = (u%ExternalPtfmSway      - u_old%ExternalPtfmSway)  / dt
+      PtfmVelocity(3)      = (u%ExternalPtfmHeave     - u_old%ExternalPtfmHeave) / dt
+      PtfmVelocity(4)      = (u%ExternalPtfmRoll*D2R  - u_old%ExternalPtfmRoll*D2R)  / dt
+      PtfmVelocity(5)      = (u%ExternalPtfmPitch*D2R - u_old%ExternalPtfmPitch*D2R) / dt
+      PtfmVelocity(6)      = (u%ExternalPtfmYaw*D2R   - u_old%ExternalPtfmYaw*D2R)   / dt
       
-END SUBROUTINE ED_FormatDispInputs
+      TTDisplacement(1)    =  u%ExternalTTDspFA
+      TTDisplacement(2)    = -u%ExternalTTDspSS
+      
+      TTVelocity(1)        = (u%ExternalTTDspFA       - u_old%ExternalTTDspFA) / dt
+      TTVelocity(2)        =-(u%ExternalTTDspSS       - u_old%ExternalTTDspSS) / dt
+      
+END SUBROUTINE ED_FormatExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine for computing outputs, used in both loose and tight coupling.
 !! This SUBROUTINE is used to compute the output channels (motions and loads) and place them in the WriteOutput() array.
@@ -8185,7 +8215,11 @@ DO K = 1,p%NumBl ! Loop through all blades
 !  (requires FrcT0Trbt, MomX0Trbt)
 !.....................................
 
-   TmpVec1 = -p%PtfmMass*( p%Gravity*CoordSys%z2 + RtHSdat%LinAccEYt  )                                              ! The portion of FrcZAllt associated with the PtfmMass
+   IF (p%DispMode == DispMode_EXTERNAL) THEN   ! @mcd: since HydroDyn is always off when using the hybrid model, we're ignoring the effects of gravity so the platform doesn't fall infinitely
+      TmpVec1 = -p%PtfmMass*( RtHSdat%LinAccEYt  )
+   ELSE
+      TmpVec1 = -p%PtfmMass*( p%Gravity*CoordSys%z2 + RtHSdat%LinAccEYt  )                                              ! The portion of FrcZAllt associated with the PtfmMass
+   ENDIF
    TmpVec2 = CROSS_PRODUCT( RtHSdat%rZY      ,   TmpVec1 )                                                                      ! The portion of MomXAllt associated with the PtfmMass
    TmpVec3 = CROSS_PRODUCT( RtHSdat%rZT0     , RtHSdat%FrcT0Trbt )                                                      ! The portion of MomXAllt associated with the FrcT0Trbt
    TmpVec  = p%PtfmRIner*CoordSys%a1*DOT_PRODUCT( CoordSys%a1, RtHSdat%AngVelEX  ) &      ! = ( Platform inertia dyadic ) dot ( angular velocity of platform in the inertia frame )
@@ -8193,8 +8227,8 @@ DO K = 1,p%NumBl ! Loop through all blades
            + p%PtfmPIner*CoordSys%a3*DOT_PRODUCT( CoordSys%a3, RtHSdat%AngVelEX  )
    TmpVec4 = CROSS_PRODUCT( -RtHSdat%AngVelEX,   TmpVec  )                                                      ! = ( -angular velocity of platform in the inertia frame ) cross ( TmpVec )
 
-   RtHSdat%FrcZAllt = RtHSdat%FrcT0Trbt + RtHSdat%FZHydrot + TmpVec1
-   RtHSdat%MomXAllt = RtHSdat%MomX0Trbt + RtHSdat%MXHydrot + TmpVec2 + TmpVec3 + TmpVec4   
+   RtHSdat%FrcZAllt = RtHSdat%FrcT0Trbt + RtHSdat%FZHydrot + TmpVec1                       ! @mcd: since HydroDyn is off for the hybrid model, FZHydrot/MXHydrot will always be zero anyways, so
+   RtHSdat%MomXAllt = RtHSdat%MomX0Trbt + RtHSdat%MXHydrot + TmpVec2 + TmpVec3 + TmpVec4   !       we don't have to worry about any if-then statement for these
    
    
 END SUBROUTINE CalculateForcesMoments

@@ -262,8 +262,7 @@ SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_Sr
    u_ED%TwrAddedMass  = 0.0_ReKi
    u_ED%PtfmAddedMass = 0.0_ReKi
    
-   
-   CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED )     
+   !CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED )     
                
 END SUBROUTINE ED_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -5089,7 +5088,6 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED
    INTEGER(IntKi)                          :: ErrStat2
    CHARACTER(ErrMsgLen)                    :: ErrMsg2
    CHARACTER(*), PARAMETER                 :: RoutineName = 'FAST_AdvanceStates'
-   REAL(DbKi)                              :: disps(24)
    
    
    
@@ -5097,8 +5095,7 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED
    ErrMsg  = ""
 
    t_global_next = (n_t_global+1) * p_FAST%dt + t_initial
-   disps = ED%x(STATE_CURR)%qt(:)
-   ED%x(STATE_CURR)%qt(:) = disps
+   
    !----------------------------------------------------------------------------------------
    ! copy the states at step m_FAST%t_global and get prediction for step t_global_next
    ! (note that we need to copy the states because UpdateStates updates the values
