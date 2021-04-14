@@ -120,7 +120,7 @@ END SUBROUTINE BD_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the inputs required for ED--using the Option 2 solve method; currently the only input not solved in this routine
 !! are the fields on PlatformPtMesh and HubPtLoad,  which are solved in option 1.
-SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD, u_SrvD, MeshMapData, ErrStat, ErrMsg, DispMode )
+SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD, u_SrvD, MeshMapData, ErrStat, ErrMsg, HybridMode )
 !..................................................................................................................................
 
    TYPE(FAST_ParameterType),       INTENT(IN   )  :: p_FAST                   !< Glue-code simulation parameters
@@ -133,7 +133,7 @@ SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_Sr
    TYPE(AD_InputType),             INTENT(IN   )  :: u_AD                     !< AD inputs (for AD-ED load transfer)
    TYPE(SrvD_OutputType),          INTENT(IN   )  :: y_SrvD                   !< ServoDyn outputs
    TYPE(SrvD_InputType),           INTENT(IN   )  :: u_SrvD                   !< ServoDyn inputs
-   INTEGER(IntKi),                 INTENT(IN   )  :: DispMode                 !< Displacement control mode (from ElastoDyn input file)
+   INTEGER(IntKi),                 INTENT(IN   )  :: HybridMode               !< Hybrid control mode (from ElastoDyn input file)
    
    TYPE(FAST_ModuleMapType),       INTENT(INOUT)  :: MeshMapData              !< Data for mapping between modules
    INTEGER(IntKi),                 INTENT(  OUT)  :: ErrStat                  !< Error status
@@ -202,7 +202,7 @@ SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_Sr
             
             END DO !J
          END DO   !K 
-      ELSEIF ( p_FAST%CompAero == Module_AD .and. DispMode == 1 ) THEN
+      ELSEIF ( p_FAST%CompAero == Module_AD .and. HybridMode /= 2 ) THEN   ! @mcd: force control has one way feedthrough from ED to AD, so this step is ignored
          
          DO K = 1,SIZE(u_ED%BladePtLoads,1) ! Loop through all blades (p_ED%NumBl)
             CALL Transfer_Line2_to_Point( y_AD%BladeLoad(k), u_ED%BladePtLoads(k), MeshMapData%AD_L_2_BDED_B(k), ErrStat2, ErrMsg2, u_AD%BladeMotion(k), y_ED%BladeLn2Mesh(k) )
@@ -242,7 +242,7 @@ SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_Sr
       
       END IF   
       
-   ELSEIF ( p_FAST%CompAero == Module_AD .and. DispMode == 1 ) THEN
+   ELSEIF ( p_FAST%CompAero == Module_AD .and. HybridMode /= 2 ) THEN   ! @mcd: force control has one way feedthrough from ED to AD, so this step is ignored
       
       IF ( y_AD%TowerLoad%Committed ) THEN
          CALL Transfer_Line2_to_Point( y_AD%TowerLoad, u_ED%TowerPtLoads, MeshMapData%AD_L_2_ED_P_T, ErrStat2, ErrMsg2, u_AD%TowerMotion, y_ED%TowerLn2Mesh )
@@ -263,27 +263,33 @@ SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_Sr
    u_ED%PtfmAddedMass = 0.0_ReKi
    
    
-   CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED )     
+   !CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED, HybridMode )     
                
 END SUBROUTINE ED_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the inputs required for ElastoDyn from an external source (Simulink)
-SUBROUTINE ED_SetExternalInputs( p_FAST, m_FAST, u_ED )
+SUBROUTINE ED_SetExternalInputs( p_FAST, m_FAST, u_ED, HybridMode )
    
    TYPE(FAST_ParameterType),         INTENT(IN)     :: p_FAST       !< Glue-code simulation parameters
    TYPE(FAST_MiscVarType),           INTENT(IN)     :: m_FAST       !< Glue-code misc variables (including inputs from external sources like Simulink)
    TYPE(ED_InputType),               INTENT(INOUT)  :: u_ED         !< ElastoDyn inputs
+   INTEGER(IntKi),                   INTENT(IN)     :: HybridMode   !< Hybrid control mode (from ElastoDyn input file)
    
-   
-      ! we are going to use extrapolated values because these external values from Simulink are at n instead of n+1
-   u_ED%ExternalPtfmSurge   =  m_FAST%ExternInput%PtfmSurge
-   u_ED%ExternalPtfmSway    =  m_FAST%ExternInput%PtfmSway
-   u_ED%ExternalPtfmHeave   =  m_FAST%ExternInput%PtfmHeave
-   u_ED%ExternalPtfmPitch   =  m_FAST%ExternInput%PtfmPitch
-   u_ED%ExternalPtfmRoll    =  m_FAST%ExternInput%PtfmRoll
-   u_ED%ExternalPtfmYaw     =  m_FAST%ExternInput%PtfmYaw
-   u_ED%ExternalTTDspFA     =  m_FAST%ExternInput%TTDspFA
-   u_ED%ExternalTTDspSS     =  m_FAST%ExternInput%TTDspSS
+   IF ( HybridMode == 1 ) THEN   ! Displacement control (force inputs, displacement outputs)
+      u_ED%PlatformPtMesh%Force(1,1)   =  m_FAST%ExternInput%PtfmSurge
+      u_ED%PlatformPtMesh%Force(2,1)   =  m_FAST%ExternInput%PtfmSway
+      u_ED%PlatformPtMesh%Force(3,1)   =  m_FAST%ExternInput%PtfmHeave
+      u_ED%PlatformPtMesh%Moment(1,1) =  m_FAST%ExternInput%PtfmRoll
+      u_ED%PlatformPtMesh%Moment(2,1) =  m_FAST%ExternInput%PtfmPitch
+      u_ED%PlatformPtMesh%Moment(3,1) =  m_FAST%ExternInput%PtfmYaw
+   ELSEIF ( HybridMode == 2 ) THEN   ! Force control (displacement inputs, force outputs)
+      u_ED%ExternalPtfmSurge   =  m_FAST%ExternInput%PtfmSurge
+      u_ED%ExternalPtfmSway    =  m_FAST%ExternInput%PtfmSway
+      u_ED%ExternalPtfmHeave   =  m_FAST%ExternInput%PtfmHeave
+      u_ED%ExternalPtfmRoll    =  m_FAST%ExternInput%PtfmRoll
+      u_ED%ExternalPtfmPitch   =  m_FAST%ExternInput%PtfmPitch
+      u_ED%ExternalPtfmYaw     =  m_FAST%ExternInput%PtfmYaw
+   END IF
       
 END SUBROUTINE ED_SetExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -470,7 +476,7 @@ SUBROUTINE AD_InputSolve_IfW( p_FAST, u_AD, y_IfW, y_OpFM, ErrStat, ErrMsg )
 END SUBROUTINE AD_InputSolve_IfW
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets all the AeroDyn inputs, except for the wind inflow values.
-SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, DispMode, ErrStat, ErrMsg )
+SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, HybridMode, ErrStat, ErrMsg )
 
       ! Passed variables
    TYPE(FAST_ParameterType),    INTENT(IN   )   :: p_FAST      !< FAST parameter data    
@@ -479,7 +485,7 @@ SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, Dis
    TYPE(ED_OutputType),         INTENT(IN)      :: y_ED        !< The outputs from the structural dynamics module
    TYPE(BeamDyn_Data),          INTENT(IN)      :: BD          !< The data from BeamDyn (want the outputs only, but it's in an array)
    TYPE(FAST_ModuleMapType),    INTENT(INOUT)   :: MeshMapData !< Data for mapping between modules
-   INTEGER(IntKi),              INTENT(IN   )   :: DispMode    !< Displacement control mode (from ElastoDyn input file)
+   INTEGER(IntKi),              INTENT(IN)      :: HybridMode   !< Hybrid control mode (from ElastoDyn input file)
    
    INTEGER(IntKi)                               :: ErrStat     !< Error status of the operation
    CHARACTER(*)                                 :: ErrMsg      !< Error message if ErrStat /= ErrID_None
@@ -508,9 +514,9 @@ SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, Dis
    ! Set the inputs from ElastoDyn and/or BeamDyn:
    !-------------------------------------------------------------------------------------------------
    
-      ! @mcd: To create a pseudo-"AD-only" numerical model, overwrite the base ElastoDyn outputs with the outputs generated via external inputs
+      ! @mcd: To create a pseudo-"AD-only" numerical model for force control, overwrite the base ElastoDyn outputs with the outputs generated via external inputs
    
-   IF (DispMode == 2) THEN  ! hybrid simulation
+   IF (HybridMode == 2) THEN  ! hybrid simulation, force control
             ! tower
       IF (u_AD%TowerMotion%Committed) THEN
       
@@ -4499,7 +4505,7 @@ end if
          
    ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
       
-      CALL AD_InputSolve_NoIfW( p_FAST, AD%Input(1), SrvD%y, ED%Output(1), BD, MeshMapData, ED%p%DispMode, ErrStat2, ErrMsg2 )   
+      CALL AD_InputSolve_NoIfW( p_FAST, AD%Input(1), SrvD%y, ED%Output(1), BD, MeshMapData, ED%p%HybridMode, ErrStat2, ErrMsg2 )   
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )        
 
          ! because we're not calling InflowWind_CalcOutput or getting new values from OpenFOAM, 
@@ -4816,7 +4822,7 @@ SUBROUTINE SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, 
    ELSE IF ( p_FAST%CompAero == Module_AD ) THEN 
                         
          ! note that this uses BD outputs, which are from the previous step (and need to be initialized)
-      CALL AD_InputSolve_NoIfW( p_FAST, AD%Input(1), SrvD%y, ED%Output(1), BD, MeshMapData, ED%p%DispMode, ErrStat2, ErrMsg2 )
+      CALL AD_InputSolve_NoIfW( p_FAST, AD%Input(1), SrvD%y, ED%Output(1), BD, MeshMapData, ED%p%HybridMode, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName ) 
          
    END IF
@@ -5007,7 +5013,7 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
               
       
    !bjj: note ED%Input(1) may be a sibling mesh of output, but ED%u is not (routine may update something that needs to be shared between siblings)      
-   CALL ED_InputSolve( p_FAST, m_FAST, ED%Input(1), ED%Output(1), AD14%p, AD14%y, AD%y, SrvD%y, AD%Input(1), SrvD%Input(1), MeshMapData, ErrStat2, ErrMsg2, ED%p%DispMode )
+   CALL ED_InputSolve( p_FAST, m_FAST, ED%Input(1), ED%Output(1), AD14%p, AD14%y, AD%y, SrvD%y, AD%Input(1), SrvD%Input(1), MeshMapData, ErrStat2, ErrMsg2, ED%p%HybridMode )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    
    CALL BD_InputSolve( p_FAST, BD, AD%y, AD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )

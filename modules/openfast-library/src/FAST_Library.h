@@ -47,7 +47,7 @@ EXTERNAL_ROUTINE void FAST_CreateCheckpoint(int * iTurb, const char *CheckpointR
 #define CHANNEL_LENGTH 20  
 #define MAXInitINPUTS 10
 
-#define NumFixedInputs  2 + 2 + MAXIMUM_BLADES + 1
+#define NumFixedInputs  6
 
 
 #endif

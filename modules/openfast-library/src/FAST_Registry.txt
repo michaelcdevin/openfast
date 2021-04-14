@@ -459,12 +459,12 @@ typedef	^	FAST_ExternInputType	ReKi	HSSBrFrac	-	-	-	"Fraction of full braking to
 typedef	^	FAST_ExternInputType	ReKi	LidarFocus	3	-	-	"lidar focus (relative to lidar location)"	m
 typedef	^	FAST_ExternInputType	ReKi	TTDspFA	-	-	-	"fore-aft tower-top displacement from Simulink"	meters
 typedef	^	FAST_ExternInputType	ReKi	TTDspSS	-	-	-	"side-to-side tower-top displacement from Simulink"	meters
-typedef	^	FAST_ExternInputType	ReKi	PtfmSurge	-	-	-	"horizontal surge translational displacement of platform from Simulink"	meters
-typedef	^	FAST_ExternInputType	ReKi	PtfmSway	-	-	-	"horizontal sway translational displacement of platform from Simulink"	meters
-typedef	^	FAST_ExternInputType	ReKi	PtfmHeave	-	-	-	"vertical heave translational displacement of platform from Simulink"	meters
-typedef	^	FAST_ExternInputType	ReKi	PtfmRoll	-	-	-	"roll tilt rotational displacement of platform from Simulink"	radians
-typedef	^	FAST_ExternInputType	ReKi	PtfmPitch	-	-	-	"pitch tilt rotational displacement of platform from Simulink"	radians
-typedef	^	FAST_ExternInputType	ReKi	PtfmYaw	-	-	-	"yaw rotational displacement of platform from Simulink"	radians
+typedef	^	FAST_ExternInputType	ReKi	PtfmSurge	-	-	-	"Surge (xi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmSway	-	-	-	"Sway (yi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmHeave	-	-	-	"Heave (zi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmRoll	-	-	-	"Roll (xi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmPitch	-	-	-	"Pitch (yi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmYaw	-	-	-	"Yaw (zi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode)"
 
 # ..... FAST_MiscVarType data .......................................................................................................
 typedef	FAST	FAST_MiscVarType	DbKi	TiLstPrn	-	-	-	"The simulation time of the last print (to file)"	(s)

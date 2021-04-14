@@ -520,12 +520,12 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(1:3)  :: LidarFocus      !< lidar focus (relative to lidar location) [m]
     REAL(ReKi)  :: TTDspFA      !< fore-aft tower-top displacement from Simulink [meters]
     REAL(ReKi)  :: TTDspSS      !< side-to-side tower-top displacement from Simulink [meters]
-    REAL(ReKi)  :: PtfmSurge      !< horizontal surge translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: PtfmSway      !< horizontal sway translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: PtfmHeave      !< vertical heave translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: PtfmRoll      !< roll tilt rotational displacement of platform from Simulink [radians]
-    REAL(ReKi)  :: PtfmPitch      !< pitch tilt rotational displacement of platform from Simulink [radians]
-    REAL(ReKi)  :: PtfmYaw      !< yaw rotational displacement of platform from Simulink [radians]
+    REAL(ReKi)  :: PtfmSurge      !< Surge (xi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmSway      !< Sway (yi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmHeave      !< Heave (zi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmRoll      !< Roll (xi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmPitch      !< Pitch (yi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmYaw      !< Yaw (zi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode) [-]
   END TYPE FAST_ExternInputType
 ! =======================
 ! =========  FAST_MiscVarType  =======

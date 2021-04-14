@@ -86,7 +86,7 @@ typedef	^	ED_BladeMeshInputData	ReKi	Chord	{:}	-	-	"Chord of the blade at the an
 # This is data defined in the Input File for this module (or could otherwise be passed in)
 # ..... Primary Input file data ...........................................................................................................
 typedef	ElastoDyn/ED	ED_InputFile	DbKi	DT	-	-	-	"Requested integration time for ElastoDyn"	seconds
-typedef	^	ED_InputFile	ReKi	DispMode	-	-	-	"Displacement control mode"	-
+typedef	^	ED_InputFile	ReKi	HybridMode	-	-	-	"Hybrid control mode"	-
 typedef	^	ED_InputFile	ReKi	Gravity	-	-	-	"Gravitational acceleration"	m/s^2
 typedef	^	ED_InputFile	LOGICAL	FlapDOF1	-	-	-	"First flapwise blade mode DOF"	-
 typedef	^	ED_InputFile	LOGICAL	FlapDOF2	-	-	-	"Second flapwise blade mode DOF"	-
@@ -558,7 +558,7 @@ typedef	^	MiscVarType	Logical	IgnoreMod	-	-	-	"whether to ignore the modulo in E
 # Time step for integration of continuous states (if a fixed-step integrator is used) and update of discrete states:
 typedef	^	ParameterType	DbKi	DT	-	-	-	"Time step for continuous state integration & discrete state update"	seconds
 typedef	^	ParameterType	DbKi	DT24	-	-	-	"=DT/24 (used in loose coupling)"	seconds
-typedef ^	ParameterType	IntKi	DispMode	-	-	-	"Displacement control mode"	-
+typedef ^	ParameterType	IntKi	HybridMode	-	-	-	"Hybrid control mode"	-
 typedef	^	ParameterType	IntKi	BldNodes	-	-	-	"Number of blade nodes used in the analysis"	-
 typedef	^	ParameterType	IntKi	TipNode	-	-	-	"Index of the additional node located at the blade tip = BldNodes + 1"	-
 typedef	^	ParameterType	IntKi	NDOF	-	-	-	"Number of total degrees of freedom (DOFs)"	-
@@ -819,8 +819,6 @@ typedef	^	InputType	ReKi	BlPitchCom	{:}	-	-	"Commanded blade pitch angles"	radia
 typedef	^	InputType	ReKi	YawMom	-	-	-	"Torque transmitted through the yaw bearing"	N-m
 typedef	^	InputType	ReKi	GenTrq	-	-	-	"Electrical generator torque"	N-m
 typedef	^	InputType	ReKi	HSSBrTrqC	-	-	-	"Commanded HSS brake torque"	N-m
-typedef	^	InputType	ReKi	ExternalTTDspFA	-	-	-	"Commanded fore-aft tower-top displacement from Simulink"	meters
-typedef	^	InputType	ReKi	ExternalTTDspSS	-	-	-	"Commanded side-to-side tower-top displacement from Simulink"	meters
 typedef	^	InputType	ReKi	ExternalPtfmSurge	-	-	-	"Commanded horizontal surge translational displacement of platform from Simulink"	meters
 typedef	^	InputType	ReKi	ExternalPtfmSway	-	-	-	"Commanded horizontal sway translational displacement of platform from Simulink"	meters
 typedef	^	InputType	ReKi	ExternalPtfmHeave	-	-	-	"Commanded vertical heave translational displacement of platform from Simulink"	meters
