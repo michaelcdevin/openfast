@@ -262,10 +262,8 @@ SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_Sr
    u_ED%TwrAddedMass  = 0.0_ReKi
    u_ED%PtfmAddedMass = 0.0_ReKi
    
-#ifdef SIMULINK_TIMESHIFT   
-   ! we're going to use the extrapolated values instead of the old values (Simulink inputs are from t, not t+dt)
-   CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED, HybridMode )
-#endif
+   
+   !CALL ED_SetExternalInputs( p_FAST, m_FAST, u_ED, HybridMode )     
                
 END SUBROUTINE ED_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
