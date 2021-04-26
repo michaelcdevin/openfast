@@ -204,7 +204,7 @@ SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_Sr
             END DO !J
          END DO   !K 
          
-      ELSEIF ( p_FAST%CompAero == Module_AD .and. HybridMode /= 2 ) THEN   ! @mcd: force control has one way feedthrough from ED to AD, so this step is ignored
+      ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
          
          DO K = 1,SIZE(u_ED%BladePtLoads,1) ! Loop through all blades (p_ED%NumBl)
             CALL Transfer_Line2_to_Point( y_AD%BladeLoad(k), u_ED%BladePtLoads(k), MeshMapData%AD_L_2_BDED_B(k), ErrStat2, ErrMsg2, u_AD%BladeMotion(k), y_ED%BladeLn2Mesh(k) )
@@ -244,7 +244,7 @@ SUBROUTINE ED_InputSolve( p_FAST, m_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_Sr
       
       END IF   
       
-   ELSEIF ( p_FAST%CompAero == Module_AD .and. HybridMode /= 2 ) THEN   ! @mcd: force control has one way feedthrough from ED to AD, so this step is ignored
+   ELSEIF ( p_FAST%CompAero == Module_AD ) THEN
       
       IF ( y_AD%TowerLoad%Committed ) THEN
          CALL Transfer_Line2_to_Point( y_AD%TowerLoad, u_ED%TowerPtLoads, MeshMapData%AD_L_2_ED_P_T, ErrStat2, ErrMsg2, u_AD%TowerMotion, y_ED%TowerLn2Mesh )
