@@ -53,7 +53,7 @@ typedef  ^  ^                 DbKi              LastTimeStep         -  -  -    
 
 # Time step for integration of continuous states (if a fixed-step integrator is used) and update of discrete states:
 typedef  ^  ParameterType     DbKi              DT                   -  -  -     "Time step for continuous state integration & discrete state update"       seconds
-#typedef  ^  ^                 DLL_Type          DLL_Orca             -  -  -     "Info for the OrcaFlex DLL"                                                -
+typedef  ^  ^                 DLL_Type          DLL_Orca             -  -  -     "Info for the OrcaFlex DLL"                                                -
 typedef  ^  ^                 CHARACTER(1024)   SimNamePath          -  -  -     "Path with simulation rootname with null end character for passing to C"   -
 typedef  ^  ^                 IntKi             SimNamePathLen       -  -  -     "Length of SimNamePath (including null char)"                              -
 typedef  ^  ^                 IntKi             NumOuts              -  0  -     "Number of parameters in the output list (number of outputs requested)"    -

@@ -491,10 +491,10 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       m%LastTimeFiltered = - p%DT      ! we'll initialize the last time the DLL was filtered as -1 DT.
       m%FirstWarn        = .TRUE.
    
-!   ELSE
+   ELSE
 
-!      p%DLL_Trgt%FileName = ""
-!      p%DLL_Trgt%ProcName = ""
+      p%DLL_Trgt%FileName = ""
+      p%DLL_Trgt%ProcName = ""
       
    END IF
          

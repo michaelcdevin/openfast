@@ -6214,7 +6214,7 @@ END SUBROUTINE FAST_CreateCheckpoint_Tary
 !! before writing the turbine data to the file.
 SUBROUTINE FAST_CreateCheckpoint_T(t_initial, n_t_global, NumTurbines, Turbine, CheckpointRoot, ErrStat, ErrMsg, Unit )
 
-!   USE BladedInterface, ONLY: CallBladedDLL  ! Hack for Bladed-style DLL
+   USE BladedInterface, ONLY: CallBladedDLL  ! Hack for Bladed-style DLL
 
    REAL(DbKi),               INTENT(IN   ) :: t_initial           !< initial time
    INTEGER(IntKi),           INTENT(IN   ) :: n_t_global          !< loop counter
@@ -6315,29 +6315,28 @@ SUBROUTINE FAST_CreateCheckpoint_T(t_initial, n_t_global, NumTurbines, Turbine, 
    END IF
    
    IF (PRESENT(Unit)) Unit = unOut
-! @mcd: commented out to avoid kernel32 dependency in DLL_Trgt. This basically makes the Bladed DLL unusable, but we don't use it in the hybrid model, so it's fine.
-! TODO: clean up Bladed DLL stuff
-   !   ! A hack to pack Bladed-style DLL data
-   !IF (Turbine%SrvD%p%UseBladedInterface) THEN
-   !   if (Turbine%SrvD%m%dll_data%avrSWAP( 1) > 0   ) then
-   !         ! store value to be overwritten
-   !      old_avrSwap1 = Turbine%SrvD%m%dll_data%avrSWAP( 1) 
-   !      FileName     = Turbine%SrvD%p%DLL_InFile
-   !         ! overwrite values:
-   !      Turbine%SrvD%p%DLL_InFile = DLLFileName
-   !      Turbine%SrvD%m%dll_data%avrSWAP(50) = REAL( LEN_TRIM(DLLFileName) ) +1 ! No. of characters in the "INFILE"  argument (-) (we add one for the C NULL CHARACTER)
-   !      Turbine%SrvD%m%dll_data%avrSWAP( 1) = -8
-   !      CALL CallBladedDLL(Turbine%SrvD%Input(1), Turbine%SrvD%p%DLL_Trgt, Turbine%SrvD%m%dll_data, Turbine%SrvD%p, ErrStat2, ErrMsg2)
-   !         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-   !
-   !         ! put values back:
-   !      Turbine%SrvD%p%DLL_InFile = FileName
-   !      Turbine%SrvD%m%dll_data%avrSWAP(50) = REAL( LEN_TRIM(FileName) ) +1 ! No. of characters in the "INFILE"  argument (-) (we add one for the C NULL CHARACTER)
-   !      Turbine%SrvD%m%dll_data%avrSWAP( 1) = old_avrSwap1
-   !   end if      
-   !END IF
-   !
-   !call cleanup()
+      
+      ! A hack to pack Bladed-style DLL data
+   IF (Turbine%SrvD%p%UseBladedInterface) THEN
+      if (Turbine%SrvD%m%dll_data%avrSWAP( 1) > 0   ) then
+            ! store value to be overwritten
+         old_avrSwap1 = Turbine%SrvD%m%dll_data%avrSWAP( 1) 
+         FileName     = Turbine%SrvD%p%DLL_InFile
+            ! overwrite values:
+         Turbine%SrvD%p%DLL_InFile = DLLFileName
+         Turbine%SrvD%m%dll_data%avrSWAP(50) = REAL( LEN_TRIM(DLLFileName) ) +1 ! No. of characters in the "INFILE"  argument (-) (we add one for the C NULL CHARACTER)
+         Turbine%SrvD%m%dll_data%avrSWAP( 1) = -8
+         CALL CallBladedDLL(Turbine%SrvD%Input(1), Turbine%SrvD%p%DLL_Trgt, Turbine%SrvD%m%dll_data, Turbine%SrvD%p, ErrStat2, ErrMsg2)
+            CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
+            ! put values back:
+         Turbine%SrvD%p%DLL_InFile = FileName
+         Turbine%SrvD%m%dll_data%avrSWAP(50) = REAL( LEN_TRIM(FileName) ) +1 ! No. of characters in the "INFILE"  argument (-) (we add one for the C NULL CHARACTER)
+         Turbine%SrvD%m%dll_data%avrSWAP( 1) = old_avrSwap1
+      end if      
+   END IF
+   
+   call cleanup()
    
 contains
    subroutine cleanup()
@@ -6394,7 +6393,7 @@ END SUBROUTINE FAST_RestoreFromCheckpoint_Tary
 !> This routine is the inverse of FAST_CreateCheckpoint_T. It reads data from a checkpoint file and populates data structures for 
 !! the turbine instance.
 SUBROUTINE FAST_RestoreFromCheckpoint_T(t_initial, n_t_global, NumTurbines, Turbine, CheckpointRoot, ErrStat, ErrMsg, Unit )
-   !USE BladedInterface, ONLY: CallBladedDLL  ! Hack for Bladed-style DLL
+   USE BladedInterface, ONLY: CallBladedDLL  ! Hack for Bladed-style DLL
 
    REAL(DbKi),               INTENT(INOUT) :: t_initial           !< initial time
    INTEGER(IntKi),           INTENT(INOUT) :: n_t_global          !< loop counter
@@ -6505,25 +6504,25 @@ SUBROUTINE FAST_RestoreFromCheckpoint_T(t_initial, n_t_global, NumTurbines, Turb
    IF ( ALLOCATED(IntKiBuf) ) DEALLOCATE(IntKiBuf)    
    
    
-   ! @mcd: commented out to avoid kernel32 dependency in DLL_Trgt. This basically makes the Bladed DLL unusable, but we don't use it in the hybrid model, so it's fine.
-   !   ! A hack to restore Bladed-style DLL data
-   !if (Turbine%SrvD%p%UseBladedInterface) then
-   !   if (Turbine%SrvD%m%dll_data%avrSWAP( 1) > 0   ) then ! this isn't allocated if UseBladedInterface is FALSE
-   !         ! store value to be overwritten
-   !      old_avrSwap1 = Turbine%SrvD%m%dll_data%avrSWAP( 1) 
-   !      FileName     = Turbine%SrvD%p%DLL_InFile
-   !         ! overwrite values before calling DLL:
-   !      Turbine%SrvD%p%DLL_InFile = DLLFileName
-   !      Turbine%SrvD%m%dll_data%avrSWAP(50) = REAL( LEN_TRIM(DLLFileName) ) +1 ! No. of characters in the "INFILE"  argument (-) (we add one for the C NULL CHARACTER)
-   !      Turbine%SrvD%m%dll_data%avrSWAP( 1) = -9
-   !      CALL CallBladedDLL(Turbine%SrvD%Input(1), Turbine%SrvD%p%DLL_Trgt,  Turbine%SrvD%m%dll_data, Turbine%SrvD%p, ErrStat2, ErrMsg2)
-   !         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )                           
-   !         ! put values back:
-   !      Turbine%SrvD%p%DLL_InFile = FileName
-   !      Turbine%SrvD%m%dll_data%avrSWAP(50) = REAL( LEN_TRIM(FileName) ) +1 ! No. of characters in the "INFILE"  argument (-) (we add one for the C NULL CHARACTER)
-   !      Turbine%SrvD%m%dll_data%avrSWAP( 1) = old_avrSwap1      
-   !   end if      
-   !end if   
+   
+      ! A hack to restore Bladed-style DLL data
+   if (Turbine%SrvD%p%UseBladedInterface) then
+      if (Turbine%SrvD%m%dll_data%avrSWAP( 1) > 0   ) then ! this isn't allocated if UseBladedInterface is FALSE
+            ! store value to be overwritten
+         old_avrSwap1 = Turbine%SrvD%m%dll_data%avrSWAP( 1) 
+         FileName     = Turbine%SrvD%p%DLL_InFile
+            ! overwrite values before calling DLL:
+         Turbine%SrvD%p%DLL_InFile = DLLFileName
+         Turbine%SrvD%m%dll_data%avrSWAP(50) = REAL( LEN_TRIM(DLLFileName) ) +1 ! No. of characters in the "INFILE"  argument (-) (we add one for the C NULL CHARACTER)
+         Turbine%SrvD%m%dll_data%avrSWAP( 1) = -9
+         CALL CallBladedDLL(Turbine%SrvD%Input(1), Turbine%SrvD%p%DLL_Trgt,  Turbine%SrvD%m%dll_data, Turbine%SrvD%p, ErrStat2, ErrMsg2)
+            CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )                           
+            ! put values back:
+         Turbine%SrvD%p%DLL_InFile = FileName
+         Turbine%SrvD%m%dll_data%avrSWAP(50) = REAL( LEN_TRIM(FileName) ) +1 ! No. of characters in the "INFILE"  argument (-) (we add one for the C NULL CHARACTER)
+         Turbine%SrvD%m%dll_data%avrSWAP( 1) = old_avrSwap1      
+      end if      
+   end if   
    
       ! deal with sibling meshes here:
    ! (ignoring for now; they are not going to be siblings on restart)
