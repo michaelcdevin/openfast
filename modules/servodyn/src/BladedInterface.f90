@@ -94,90 +94,91 @@ MODULE BladedInterface
    INTEGER(IntKi), PARAMETER    :: R = R_v4           !< start of the generator speed look-up table  
             
 
-CONTAINS
+   CONTAINS
 !==================================================================================================================================
 !> This SUBROUTINE is used to call the Bladed-style DLL.
-SUBROUTINE CallBladedDLL ( u, DLL, dll_data, p, ErrStat, ErrMsg )
-
-      ! Passed Variables:
-   TYPE(SrvD_InputType),      INTENT(IN   )  :: u              ! System inputs
-   TYPE(DLL_Type),            INTENT(IN   )  :: DLL            ! The DLL to be called.
-   TYPE(BladedDLLType),       INTENT(INOUT)  :: dll_data       ! data type containing the avrSWAP, accINFILE, and avcOUTNAME arrays 
-   TYPE(SrvD_ParameterType),  INTENT(IN   )  :: p              ! Parameters
-   !REAL(SiKi),                INTENT(INOUT)  :: avrSWAP   (*)  ! The swap array, used to pass data to, and receive data from, the DLL controller.
-   !INTEGER(B1Ki),             INTENT(IN   )  :: accINFILE (*)  ! The address of the first record of an array of 1-byte CHARACTERs giving the name of the parameter input file, 'DISCON.IN'.
-   !INTEGER(B1Ki),             INTENT(IN   )  :: avcOUTNAME(*)  ! The address of the first record of an array of 1-byte CHARACTERS giving the simulation run name without extension.
-
-
-   INTEGER(IntKi),            INTENT(  OUT)  :: ErrStat        ! Error status of the operation
-   CHARACTER(*),              INTENT(  OUT)  :: ErrMsg         ! Error message if ErrStat /= ErrID_None
-   
-      ! Local Variables:
-
-   INTEGER(C_INT)                            :: aviFAIL                        ! A flag used to indicate the success of this DLL call set as follows: 0 if the DLL call was successful, >0 if the DLL call was successful but cMessage should be issued as a warning messsage, <0 if the DLL call was unsuccessful or for any other reason the simulation is to be stopped at this point with cMessage as the error message.
-   CHARACTER(KIND=C_CHAR)                    :: accINFILE(LEN_TRIM(p%DLL_InFile)+1)  ! INFILE
-   CHARACTER(KIND=C_CHAR)                    :: avcOUTNAME(LEN_TRIM(p%RootName)+1)   ! OUTNAME (Simulation RootName)
-   CHARACTER(KIND=C_CHAR)                    :: avcMSG(LEN(ErrMsg)+1)                ! MESSAGE (Message from DLL to simulation code [ErrMsg])   
-   
-      
-   PROCEDURE(BladedDLL_Procedure), POINTER   :: DLL_Subroutine                 ! The address of the procedure in the Bladed DLL
-   PROCEDURE(BladedDLL_SC_Procedure),POINTER :: DLL_SC_Subroutine              ! The address of the supercontroller procedure in the Bladed DLL
-
-      
-      ! initialize aviFAIL
-   aviFAIL = 0                ! bjj, this won't necessarially work if aviFAIL is INTENT(OUT) in DLL_Procedure()--could be undefined???
-   
-      !Convert to C-type characters: the "C_NULL_CHAR" converts the Fortran string to a C-type string (i.e., adds //CHAR(0) to the end)
-   
-   avcOUTNAME = TRANSFER( TRIM(p%RootName)//C_NULL_CHAR,   avcOUTNAME )
-   accINFILE  = TRANSFER( TRIM(p%DLL_InFile)//C_NULL_CHAR, accINFILE  )
-   avcMSG     = TRANSFER( C_NULL_CHAR,                     avcMSG     ) !bjj this is intent(out), so we shouldn't have to do this, but, to be safe...
-   
-#ifdef STATIC_DLL_LOAD
-
-      ! if we're statically loading the library (i.e., OpenFOAM), we can just call DISCON(); 
-      ! I'll leave some options for whether the supercontroller is being used
-#ifdef LOAD_SUPERCONTROLLER
-   CALL DISCON( dll_data%avrSWAP, u%SuperController, dll_data%SCoutput, aviFAIL, accINFILE, avcOUTNAME, avcMSG )
-#else
-   CALL DISCON( dll_data%avrSWAP, aviFAIL, accINFILE, avcOUTNAME, avcMSG )
-#endif
-
-#else
-
-   IF ( ALLOCATED(dll_data%SCoutput) ) THEN
-         ! Call the DLL (first associate the address from the procedure in the DLL with the subroutine):
-      CALL C_F_PROCPOINTER( DLL%ProcAddr(1), DLL_SC_Subroutine) 
-      CALL DLL_SC_Subroutine ( dll_data%avrSWAP, u%SuperController, dll_data%SCoutput, aviFAIL, accINFILE, avcOUTNAME, avcMSG ) 
-            
-   ELSE
-      
-         ! Call the DLL (first associate the address from the procedure in the DLL with the subroutine):
-      CALL C_F_PROCPOINTER( DLL%ProcAddr(1), DLL_Subroutine) 
-      CALL DLL_Subroutine ( dll_data%avrSWAP, aviFAIL, accINFILE, avcOUTNAME, avcMSG ) 
-      
-   END IF
-   
-#endif
-   
-   IF ( aviFAIL /= 0 ) THEN
-
-      ErrMsg = TRANSFER(avcMSG,ErrMsg) !convert C character array to Fortran string
-      CALL RemoveNullChar( ErrMsg ) 
-      
-      IF ( aviFAIL > 0 ) THEN
-         ErrStat = ErrID_Info
-      ELSE
-         ErrStat = ErrID_Fatal
-      END IF
-               
-   ELSE
-      ErrStat = ErrID_None
-      ErrMsg = ''
-   END IF
-   
-   RETURN
-END SUBROUTINE CallBladedDLL
+   ! @mcd: commented out to avoid kernel32 dependency
+!SUBROUTINE CallBladedDLL ( u, DLL, dll_data, p, ErrStat, ErrMsg )
+!
+!      ! Passed Variables:
+!   TYPE(SrvD_InputType),      INTENT(IN   )  :: u              ! System inputs
+!   TYPE(DLL_Type),            INTENT(IN   )  :: DLL            ! The DLL to be called.
+!   TYPE(BladedDLLType),       INTENT(INOUT)  :: dll_data       ! data type containing the avrSWAP, accINFILE, and avcOUTNAME arrays 
+!   TYPE(SrvD_ParameterType),  INTENT(IN   )  :: p              ! Parameters
+!   !REAL(SiKi),                INTENT(INOUT)  :: avrSWAP   (*)  ! The swap array, used to pass data to, and receive data from, the DLL controller.
+!   !INTEGER(B1Ki),             INTENT(IN   )  :: accINFILE (*)  ! The address of the first record of an array of 1-byte CHARACTERs giving the name of the parameter input file, 'DISCON.IN'.
+!   !INTEGER(B1Ki),             INTENT(IN   )  :: avcOUTNAME(*)  ! The address of the first record of an array of 1-byte CHARACTERS giving the simulation run name without extension.
+!
+!
+!   INTEGER(IntKi),            INTENT(  OUT)  :: ErrStat        ! Error status of the operation
+!   CHARACTER(*),              INTENT(  OUT)  :: ErrMsg         ! Error message if ErrStat /= ErrID_None
+!   
+!      ! Local Variables:
+!
+!   INTEGER(C_INT)                            :: aviFAIL                        ! A flag used to indicate the success of this DLL call set as follows: 0 if the DLL call was successful, >0 if the DLL call was successful but cMessage should be issued as a warning messsage, <0 if the DLL call was unsuccessful or for any other reason the simulation is to be stopped at this point with cMessage as the error message.
+!   CHARACTER(KIND=C_CHAR)                    :: accINFILE(LEN_TRIM(p%DLL_InFile)+1)  ! INFILE
+!   CHARACTER(KIND=C_CHAR)                    :: avcOUTNAME(LEN_TRIM(p%RootName)+1)   ! OUTNAME (Simulation RootName)
+!   CHARACTER(KIND=C_CHAR)                    :: avcMSG(LEN(ErrMsg)+1)                ! MESSAGE (Message from DLL to simulation code [ErrMsg])   
+!   
+!      
+!   PROCEDURE(BladedDLL_Procedure), POINTER   :: DLL_Subroutine                 ! The address of the procedure in the Bladed DLL
+!   PROCEDURE(BladedDLL_SC_Procedure),POINTER :: DLL_SC_Subroutine              ! The address of the supercontroller procedure in the Bladed DLL
+!
+!      
+!      ! initialize aviFAIL
+!   aviFAIL = 0                ! bjj, this won't necessarially work if aviFAIL is INTENT(OUT) in DLL_Procedure()--could be undefined???
+!   
+!      !Convert to C-type characters: the "C_NULL_CHAR" converts the Fortran string to a C-type string (i.e., adds //CHAR(0) to the end)
+!   
+!   avcOUTNAME = TRANSFER( TRIM(p%RootName)//C_NULL_CHAR,   avcOUTNAME )
+!   accINFILE  = TRANSFER( TRIM(p%DLL_InFile)//C_NULL_CHAR, accINFILE  )
+!   avcMSG     = TRANSFER( C_NULL_CHAR,                     avcMSG     ) !bjj this is intent(out), so we shouldn't have to do this, but, to be safe...
+!   
+!#ifdef STATIC_DLL_LOAD
+!
+!      ! if we're statically loading the library (i.e., OpenFOAM), we can just call DISCON(); 
+!      ! I'll leave some options for whether the supercontroller is being used
+!#ifdef LOAD_SUPERCONTROLLER
+!   CALL DISCON( dll_data%avrSWAP, u%SuperController, dll_data%SCoutput, aviFAIL, accINFILE, avcOUTNAME, avcMSG )
+!#else
+!   CALL DISCON( dll_data%avrSWAP, aviFAIL, accINFILE, avcOUTNAME, avcMSG )
+!#endif
+!
+!#else
+!
+!   IF ( ALLOCATED(dll_data%SCoutput) ) THEN
+!         ! Call the DLL (first associate the address from the procedure in the DLL with the subroutine):
+!      CALL C_F_PROCPOINTER( DLL%ProcAddr(1), DLL_SC_Subroutine) 
+!      CALL DLL_SC_Subroutine ( dll_data%avrSWAP, u%SuperController, dll_data%SCoutput, aviFAIL, accINFILE, avcOUTNAME, avcMSG ) 
+!            
+!   ELSE
+!      
+!         ! Call the DLL (first associate the address from the procedure in the DLL with the subroutine):
+!      CALL C_F_PROCPOINTER( DLL%ProcAddr(1), DLL_Subroutine) 
+!      CALL DLL_Subroutine ( dll_data%avrSWAP, aviFAIL, accINFILE, avcOUTNAME, avcMSG ) 
+!      
+!   END IF
+!   
+!#endif
+!   
+!   IF ( aviFAIL /= 0 ) THEN
+!
+!      ErrMsg = TRANSFER(avcMSG,ErrMsg) !convert C character array to Fortran string
+!      CALL RemoveNullChar( ErrMsg ) 
+!      
+!      IF ( aviFAIL > 0 ) THEN
+!         ErrStat = ErrID_Info
+!      ELSE
+!         ErrStat = ErrID_Fatal
+!      END IF
+!               
+!   ELSE
+!      ErrStat = ErrID_None
+!      ErrMsg = ''
+!   END IF
+!   
+!   RETURN
+!END SUBROUTINE CallBladedDLL
 !==================================================================================================================================
 !> This routine initializes variables used in the Bladed DLL interface.
 SUBROUTINE BladedInterface_Init(u,p,m,y,InputFileData, ErrStat, ErrMsg)
@@ -280,23 +281,24 @@ SUBROUTINE BladedInterface_Init(u,p,m,y,InputFileData, ErrStat, ErrMsg)
    m%dll_data%YawRateCom = 0.0
    m%dll_data%HSSBrFrac  = 0.0
 
-   
-#ifdef STATIC_DLL_LOAD
-      ! because OpenFOAM needs the MPI task to copy the library, we're not going to dynamically load it; it needs to be loaded at runtime.
-   p%DLL_Trgt%FileName = ''
-   p%DLL_Trgt%ProcName = ''
-#else
-   ! Define and load the DLL:
-
-   p%DLL_Trgt%FileName = InputFileData%DLL_FileName
-
-   p%DLL_Trgt%ProcName = "" ! initialize all procedures to empty so we try to load only one
-   p%DLL_Trgt%ProcName(1) = InputFileData%DLL_ProcName
-
-   CALL LoadDynamicLib ( p%DLL_Trgt, ErrStat2, ErrMsg2 )
-      CALL CheckError(ErrStat2,ErrMsg2)
-      IF ( ErrStat >= AbortErrLev ) RETURN
-#endif
+ 
+! @mcd: commented out to avoid kernel32 dependency
+!#ifdef STATIC_DLL_LOAD
+!      ! because OpenFOAM needs the MPI task to copy the library, we're not going to dynamically load it; it needs to be loaded at runtime.
+!   p%DLL_Trgt%FileName = ''
+!   p%DLL_Trgt%ProcName = ''
+!#else
+!   ! Define and load the DLL:
+!
+!   p%DLL_Trgt%FileName = InputFileData%DLL_FileName
+!
+!   p%DLL_Trgt%ProcName = "" ! initialize all procedures to empty so we try to load only one
+!   p%DLL_Trgt%ProcName(1) = InputFileData%DLL_ProcName
+!
+!   CALL LoadDynamicLib ( p%DLL_Trgt, ErrStat2, ErrMsg2 )
+!      CALL CheckError(ErrStat2,ErrMsg2)
+!      IF ( ErrStat >= AbortErrLev ) RETURN
+!#endif
       
     ! Set status flag:
 
@@ -362,11 +364,13 @@ SUBROUTINE BladedInterface_End(u, p, m, ErrStat, ErrMsg)
          m%dll_data%avrSWAP( 1) = -1.0   ! Status flag set as follows: 0 if this is the first call, 1 for all subsequent time steps, -1 if this is the final call at the end of the simulation (-)
          !CALL Fill_avrSWAP( -1_IntKi, -10.0_DbKi, u, p, LEN(ErrMsg), m%dll_data )
 
-         CALL CallBladedDLL(u, p%DLL_Trgt,  m%dll_data, p, ErrStat, ErrMsg)
+         ! @mcd: commented out to remove kernel32 dependency
+         !CALL CallBladedDLL(u, p%DLL_Trgt,  m%dll_data, p, ErrStat, ErrMsg)
       END IF
    end if
-      
-   CALL FreeDynamicLib( p%DLL_Trgt, ErrStat2, ErrMsg2 )  ! this doesn't do anything #ifdef STATIC_DLL_LOAD  because p%DLL_Trgt is 0 (NULL)
+    
+   ! @mcd: commented out to remove kernel32 dependency
+   !CALL FreeDynamicLib( p%DLL_Trgt, ErrStat2, ErrMsg2 )  ! this doesn't do anything #ifdef STATIC_DLL_LOAD  because p%DLL_Trgt is 0 (NULL)
    IF (ErrStat2 /= ErrID_None) THEN  
       ErrStat = MAX(ErrStat, ErrStat2)      
       ErrMsg = TRIM(ErrMsg)//NewLine//TRIM(ErrMsg2)
@@ -404,10 +408,10 @@ CALL WrNumAryFileNR ( 58, m%dll_data%avrSWAP,'1x,ES15.6E2', ErrStat, ErrMsg )
 write(58,'()')
 #endif
    
-   
-      ! Call the Bladed-style DLL controller:
-   CALL CallBladedDLL(u, p%DLL_Trgt,  m%dll_data, p, ErrStat, ErrMsg)
-      IF ( ErrStat >= AbortErrLev ) RETURN
+! @mcd: commented out to avoid kernel32 dependency   
+   !   ! Call the Bladed-style DLL controller:
+   !CALL CallBladedDLL(u, p%DLL_Trgt,  m%dll_data, p, ErrStat, ErrMsg)
+   !   IF ( ErrStat >= AbortErrLev ) RETURN
 
 #ifdef DEBUG_BLADED_INTERFACE
 !CALL WrNumAryFileNR ( 59, (/t/),'1x,ES15.6E2', ErrStat, ErrMsg )
@@ -617,7 +621,7 @@ SUBROUTINE Retrieve_avrSWAP( p, dll_data, ErrStat, ErrMsg )
          
       IF ( ErrStat /= ErrID_None ) ErrMsg = TRIM(ErrMsg)//NewLine
       ErrMsg = TRIM(ErrMsg)//'Only off and main generators supported in '//TRIM( GetNVD( BladedInterface_Ver ) )// &
-               '. Set avrSWAP(35) to 0 or 1 in '//TRIM(p%DLL_Trgt%FileName)//'.'
+               '. Set avrSWAP(35) to 0 or 1 in p%DLL_Trgt%FileName.' ! @mcd: originally var call, removed to avoid kernel32 dependency
       ErrStat = ErrID_Fatal
       
    END IF   
@@ -633,7 +637,7 @@ SUBROUTINE Retrieve_avrSWAP( p, dll_data, ErrStat, ErrMsg )
 
       IF ( ErrStat /= ErrID_None ) ErrMsg = TRIM(ErrMsg)//NewLine
       ErrMsg = TRIM(ErrMsg)//'Shaft brake status improperly set in '//TRIM( GetNVD( BladedInterface_Ver ) )//&
-               '. Set avrSWAP(36) to 0 or 1 in '//TRIM(p%DLL_Trgt%FileName)//'.'      
+               '. Set avrSWAP(36) to 0 or 1 in p%DLL_Trgt%FileName.' ! @mcd: originally var call, removed to avoid kernel32 dependency
       ErrStat = ErrID_Fatal
 
    END IF   
@@ -667,7 +671,7 @@ SUBROUTINE Retrieve_avrSWAP( p, dll_data, ErrStat, ErrMsg )
          
       IF ( ErrStat /= ErrID_None ) ErrMsg = TRIM(ErrMsg)//NewLine
       ErrMsg = TRIM(ErrMsg)//'Built-in pitch unsupported in '//TRIM( GetNVD( BladedInterface_Ver ) )//&
-               '. Set avrSWAP(55) to 0 in '//TRIM(p%DLL_Trgt%FileName)//'.'
+               '. Set avrSWAP(55) to 0 in p%DLL_Trgt%FileName.' ! @mcd: originally var call, removed to avoid kernel32 dependency
       ErrStat = ErrID_Fatal
    END IF
    
@@ -679,7 +683,7 @@ SUBROUTINE Retrieve_avrSWAP( p, dll_data, ErrStat, ErrMsg )
          
       IF ( ErrStat /= ErrID_None ) ErrMsg = TRIM(ErrMsg)//NewLine
       ErrMsg = TRIM(ErrMsg)//'Built-in torque unsupported in '//TRIM( GetNVD( BladedInterface_Ver ) )//&
-               '. Set avrSWAP(56) to 0 in '//TRIM(p%DLL_Trgt%FileName)//'.'
+               '. Set avrSWAP(56) to 0 in p%DLL_Trgt%FileName.' ! @mcd: originally var call, removed to avoid kernel32 dependency
       ErrStat = ErrID_Fatal
    END IF
 
@@ -693,7 +697,7 @@ SUBROUTINE Retrieve_avrSWAP( p, dll_data, ErrStat, ErrMsg )
          
       IF ( ErrStat /= ErrID_None ) ErrMsg = TRIM(ErrMsg)//NewLine
       ErrMsg = TRIM(ErrMsg)//'Return variables unsupported in '//TRIM( GetNVD( BladedInterface_Ver ) )//&
-               '. Set avrSWAP(65) to 0 in '//TRIM(p%DLL_Trgt%FileName)//'.'
+               '. Set avrSWAP(65) to 0 in p%DLL_Trgt%FileName.' ! @mcd: originally var call, removed to avoid kernel32 dependency
       ErrStat = ErrID_Fatal
 
    ENDIF

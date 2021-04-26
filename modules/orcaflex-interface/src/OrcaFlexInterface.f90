@@ -284,25 +284,25 @@ SUBROUTINE Orca_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
 
 
 
-
-      ! Init routine load
-   p%DLL_Orca%FileName     = InputFileData%DLL_FileName
-   p%DLL_Orca%ProcName(1)  = InputFileData%DLL_InitProcName
-   p%DLL_Orca%ProcName(2)  = InputFileData%DLL_CalcProcName
-   p%DLL_Orca%ProcName(3)  = InputFileData%DLL_EndProcName
-
-#ifdef NO_LibLoad
-   CALL SetErrStat( ErrID_Warn,'   -->  Skipping LoadDynamicLib call for '//TRIM(p%DLL_Orca%FileName),ErrStat,ErrMsg,RoutineName )
-#else
-   CALL LoadDynamicLib ( p%DLL_Orca, ErrStatTmp, ErrMsgTmp )
-   CALL SetErrStat( ErrStatTmp, ErrMsgTmp, ErrStat, ErrMsg, RoutineName)
-   IF ( ErrStat >= AbortErrLev ) THEN
-      CALL CleanUp
-      RETURN
-   END IF
-
-   CALL C_F_PROCPOINTER( p%DLL_Orca%ProcAddr(1), OrcaDLL_Init )
-#endif
+! @mcd: commented out to avoid kernel32 dependency  
+   !   ! Init routine load
+   !p%DLL_Orca%FileName     = InputFileData%DLL_FileName
+   !p%DLL_Orca%ProcName(1)  = InputFileData%DLL_InitProcName
+   !p%DLL_Orca%ProcName(2)  = InputFileData%DLL_CalcProcName
+   !p%DLL_Orca%ProcName(3)  = InputFileData%DLL_EndProcName
+ 
+!#ifdef NO_LibLoad
+!   CALL SetErrStat( ErrID_Warn,'   -->  Skipping LoadDynamicLib call for '//TRIM(p%DLL_Orca%FileName),ErrStat,ErrMsg,RoutineName )
+!#else
+!   CALL LoadDynamicLib ( p%DLL_Orca, ErrStatTmp, ErrMsgTmp )
+!   CALL SetErrStat( ErrStatTmp, ErrMsgTmp, ErrStat, ErrMsg, RoutineName)
+!   IF ( ErrStat >= AbortErrLev ) THEN
+!      CALL CleanUp
+!      RETURN
+!   END IF
+!
+!   CALL C_F_PROCPOINTER( p%DLL_Orca%ProcAddr(1), OrcaDLL_Init )
+!#endif
 
 
 
@@ -624,18 +624,18 @@ SUBROUTINE Orca_End( u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
 
 
 
-
-#ifdef NO_LibLoad
-   CALL SetErrStat( ErrID_Warn,'   -->  Skipping OrcaDLL_End call',ErrStat,ErrMsg,RoutineName )
-#else
-      ! Release the DLL
-   CALL C_F_PROCPOINTER( p%DLL_Orca%ProcAddr(3), OrcaDLL_End )
-   CALL OrcaDLL_End        ! No error handling here.  Just have to assume it worked.
-
-
-   CALL FreeDynamicLib( p%DLL_Orca, ErrStatTmp, ErrMsgTmp )
-   CALL SetErrStat( ErrStatTmp,ErrMsgTmp,ErrStat,ErrMsg,RoutineName )   
-#endif
+! @mcd: commented out to avoid kernel32 dependency
+!#ifdef NO_LibLoad
+!   CALL SetErrStat( ErrID_Warn,'   -->  Skipping OrcaDLL_End call',ErrStat,ErrMsg,RoutineName )
+!#else
+!      ! Release the DLL
+!   CALL C_F_PROCPOINTER( p%DLL_Orca%ProcAddr(3), OrcaDLL_End )
+!   CALL OrcaDLL_End        ! No error handling here.  Just have to assume it worked.
+!
+!
+!   CALL FreeDynamicLib( p%DLL_Orca, ErrStatTmp, ErrMsgTmp )
+!   CALL SetErrStat( ErrStatTmp,ErrMsgTmp,ErrStat,ErrMsg,RoutineName )   
+!#endif
 
 
       ! Destroy the input data:
@@ -758,7 +758,9 @@ SUBROUTINE Orca_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg
       ! call is different from the first only with the accelerations, which OrcaFlex does not do anything with.
    IF ( t > m%LastTimeStep .and. .not. EqualRealNos(t,m%LastTimeStep) ) THEN
          ! Setup the pointer to the DLL procedure
-      CALL C_F_PROCPOINTER( p%DLL_Orca%ProcAddr(2), OrcaDLL_Calc )
+      ! @mcd: commented out to remove kernel32 dependency on DLL_Orca. This completely breaks OrcaFlex, but we won't be using it, so it won't matter much
+      ! @mcd: TODO clean up OrcaFlex in build
+       !      CALL C_F_PROCPOINTER( p%DLL_Orca%ProcAddr(2), OrcaDLL_Calc )
          ! Call OrcaFlex to run the calculation.  There is no error trapping on the OrcaFlex side, so we will have to do some checks on what receive back
       CALL OrcaDLL_Calc( DLL_X, DLL_Xdot, DLL_ZTime, DLL_DirRootName, DLL_PtfmAM, DLL_PtfmFt )
       m%LastTimeStep =  t

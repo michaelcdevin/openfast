@@ -275,7 +275,7 @@ typedef	^	ParameterType	ReKi	PtchRate_Max	-	-	-	"Maximum pitch rate"	rad/s
 typedef	^	ParameterType	ReKi	PtchRate_Min	-	-	-	"Minimum pitch rate (most negative value allowed)"	rad/s
 typedef	^	ParameterType	ReKi	NacYaw_North	-	-	-	"Reference yaw angle of the nacelle when the upwind end points due North"	rad
 typedef	^	ParameterType	CHARACTER(1024)	DLL_InFile	-	-	-	"Name of input file used in DLL"	-
-typedef	^	ParameterType	DLL_Type	DLL_Trgt	-	-	-	"The addresses and names of the Bladed DLL and its procedure"	-
+#typedef	^	ParameterType	DLL_Type	DLL_Trgt	-	-	-	"The addresses and names of the Bladed DLL and its procedure"	-
 typedef	^	ParameterType	TMD_ParameterType	NTMD	-	-	-	"TMD module parameters - nacelle"	-
 typedef	^	ParameterType	TMD_ParameterType	TTMD	-	-	-	"TMD module parameters - tower"	-
 typedef	^	ParameterType	ReKi	AvgWindSpeed	-	-	-	"average wind speed for the simulation"	m/s
