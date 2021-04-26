@@ -1218,16 +1218,14 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       end do   
    end if
    
-   m_FAST%ExternInput%LidarFocus = 1.0_ReKi  ! make this non-zero (until we add the initial position in the InflowWind input file)
+   m_FAST%ExternInput%LidarFocus  = 1.0_ReKi  ! make this non-zero (until we add the initial position in the InflowWind input file)
    
-   m_FAST%ExternInput%PtfmSurge = ED%Input(1)%ExternalPtfmSurge
-   m_FAST%ExternInput%PtfmSway  = ED%Input(1)%ExternalPtfmSway
-   m_FAST%ExternInput%PtfmHeave = ED%Input(1)%ExternalPtfmHeave
-   m_FAST%ExternInput%PtfmPitch = ED%Input(1)%ExternalPtfmPitch
-   m_FAST%ExternInput%PtfmRoll  = ED%Input(1)%ExternalPtfmRoll
-   m_FAST%ExternInput%PtfmYaw   = ED%Input(1)%ExternalPtfmYaw
-   m_FAST%ExternInput%TTDspFA   = ED%Input(1)%ExternalTTDspFA
-   m_FAST%ExternInput%TTDspSS   = ED%Input(1)%ExternalTTDspSS
+   m_FAST%ExternInput%PtfmSurge   = ED%Input(1)%ExternalPtfmSurge
+   m_FAST%ExternInput%PtfmSway    = ED%Input(1)%ExternalPtfmSway
+   m_FAST%ExternInput%PtfmHeave   = ED%Input(1)%ExternalPtfmHeave
+   m_FAST%ExternInput%PtfmPitch   = ED%Input(1)%ExternalPtfmPitch
+   m_FAST%ExternInput%PtfmRoll    = ED%Input(1)%ExternalPtfmRoll
+   m_FAST%ExternInput%PtfmYaw     = ED%Input(1)%ExternalPtfmYaw
    
    !...............................................................................................................................
    ! Destroy initializion data
@@ -3789,9 +3787,7 @@ SUBROUTINE FAST_Solution0(p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, O
    ! This code will be specific to the underlying modules
    
       ! the initial ElastoDyn, ServoDyn and IfW/Lidar inputs from Simulink:
-   IF ( ED%p%DispMode == 2) THEN
-      CALL ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
-   END IF
+   CALL ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1), ED%p%HybridMode )
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )   
    IF ( p_FAST%CompInflow == Module_IfW ) CALL IfW_SetExternalInputs( IfW%p, m_FAST, ED%Output(1), IfW%Input(1) )
 
@@ -4402,9 +4398,7 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
    
       ! the ServoDyn and ElastoDyn inputs from Simulink are for t, not t+dt, so we're going to overwrite the inputs from
       ! the previous step before we extrapolate these inputs:
-   IF ( ED%p%DispMode == 2) THEN
-      CALL ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1) )
-   END IF
+   CALL ED_SetExternalInputs( p_FAST, m_FAST, ED%Input(1), ED%p%HybridMode )
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )
 
    

@@ -95,8 +95,8 @@ MODULE ElastoDyn_Parameters
    INTEGER(IntKi), PARAMETER        :: Method_AB4  = 2
    INTEGER(IntKi), PARAMETER        :: Method_ABM4 = 3
 
-   INTEGER(IntKi), PARAMETER        :: DispMode_INTERNAL   = 1          !< The (ElastoDyn-universal) control code for obtaining the displacement values through normal FAST simulations
-   INTEGER(IntKi), PARAMETER        :: DispMode_EXTERNAL   = 2          !< The (ElastoDyn-universal) control code for obtaining the displacement values from Simulink  
+   INTEGER(IntKi), PARAMETER        :: HybridMode_DISPCTRL    = 1          !< The (ElastoDyn-universal) control code for specifying the displacement control (force inputs, displacement outputs) hybrid modeling approach via Simulink
+   INTEGER(IntKi), PARAMETER        :: HybridMode_FORCECTRL   = 2          !< The (ElastoDyn-universal) control code for specifying the force control (displacement inputs, force outputs) hybrid modeling approach via Simulink
    
    INTEGER(IntKi), PARAMETER        :: PolyOrd  =  6                                    ! Order of the polynomial describing the mode shape
 
@@ -3387,8 +3387,8 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, BldFile, FurlFile, TwrFile
          RETURN
       END IF
       
-      ! DispMode - Displacement control mode, internal (i.e. normal OpenFAST) or external (i.e. Simulink)
-   CALL ReadVar( UnIn, InputFile, InputFileData%DispMode, "DispMode", "Displacement control mode: {1: Internal (normal FAST routine), 2: External (Simulink)}", ErrStat2, ErrMsg2, UnEc)
+      ! HybridMode - Displacement control mode, internal (i.e. normal OpenFAST) or external (i.e. Simulink)
+   CALL ReadVar( UnIn, InputFile, InputFileData%HybridMode, "HybridMode", "Hybrid control mode: {0: Internal (normal FAST routine), 1: Displacement control, or 2: Force control}", ErrStat2, ErrMsg2, UnEc)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF ( ErrStat >= AbortErrLev ) THEN
           CALL Cleanup()
@@ -5002,16 +5002,18 @@ SUBROUTINE ValidatePrimaryData( InputFileData, BD4Blades, Linearize, ErrStat, Er
       END IF
    END IF
 
-      ! Make sure the specified displacement mode is valid:
-   IF ( InputFileData%DispMode .ne. DispMode_INTERNAL) THEN
-       IF ( InputFileData%DispMode .eq. DispMode_EXTERNAL)  THEN
-          IF ( .NOT. Cmpl4SFun) THEN ! Not interfacing with Simulink
-             CALL SetErrStat( ErrID_Fatal, 'DispMode can equal '//TRIM(Num2LStr(DispMode_EXTERNAL))//' only when ElastoDyn is interfaced with Simulink.'// &
-                         '  Set DispMode to 1 or interface ElastoDyn with Simulink.', ErrStat, ErrMsg, RoutineName )          
-          END IF
-       ELSE ! Invalid input value
-          CALL SetErrStat( ErrID_Fatal, 'Displacement mode must be 1 (internal) or 2 (external)',ErrStat,ErrMsg,RoutineName)
-       END IF
+      ! Make sure the specified hybrid mode is valid:
+   IF ( InputFileData%HybridMode <= 2 ) THEN
+      IF ( InputFileData%HybridMode == 1 .OR. InputFileData%HybridMode == 2 ) THEN
+         IF ( .NOT. Cmpl4SFun) THEN ! Not interfacing with Simulink
+            CALL SetErrStat( ErrID_Fatal, 'HybridMode can equal '//TRIM(Num2LStr(InputFileData%HybridMode))//' only when interfaced with Simulink.'// &
+                ' Set HybridMode to 0 or interface OpenFAST with Simulink.', ErrStat, ErrMsg, RoutineName )          
+         ENDIF
+      ELSEIF ( InputFileData%HybridMode < 0 ) THEN
+          CALL SetErrStat( ErrID_Fatal, 'HybridMode must be set to 0 (internal), 1 (displacement control), or 2 (force control)',ErrStat,ErrMsg,RoutineName)
+      ENDIF
+   ELSE  ! Invalid input value
+      CALL SetErrStat( ErrID_Fatal, 'HybridMode must be set to 0 (internal), 1 (displacement control), or 2 (force control)',ErrStat,ErrMsg,RoutineName)
    END IF
    
       ! make sure GBoxEff is 100% for now

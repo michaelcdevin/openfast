@@ -533,14 +533,12 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(1:3)  :: BlPitchCom      !< blade pitch commands from Simulink/Labview [rad/s]
     REAL(ReKi)  :: HSSBrFrac      !< Fraction of full braking torque: 0 (off) <= HSSBrFrac <= 1 (full) from Simulink or LabVIEW [-]
     REAL(ReKi) , DIMENSION(1:3)  :: LidarFocus      !< lidar focus (relative to lidar location) [m]
-    REAL(ReKi)  :: TTDspFA      !< fore-aft tower-top displacement from Simulink [meters]
-    REAL(ReKi)  :: TTDspSS      !< side-to-side tower-top displacement from Simulink [meters]
-    REAL(ReKi)  :: PtfmSurge      !< horizontal surge translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: PtfmSway      !< horizontal sway translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: PtfmHeave      !< vertical heave translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: PtfmRoll      !< roll tilt rotational displacement of platform from Simulink [radians]
-    REAL(ReKi)  :: PtfmPitch      !< pitch tilt rotational displacement of platform from Simulink [radians]
-    REAL(ReKi)  :: PtfmYaw      !< yaw rotational displacement of platform from Simulink [radians]
+    REAL(ReKi)  :: PtfmSurge      !< Surge (xi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmSway      !< Sway (yi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmHeave      !< Heave (zi-direction) translational displacement or hydrodynamic force of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmRoll      !< Roll (xi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmPitch      !< Pitch (yi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode) [-]
+    REAL(ReKi)  :: PtfmYaw      !< Yaw (zi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode) [-]
   END TYPE FAST_ExternInputType
 ! =======================
 ! =========  FAST_MiscVarType  =======
@@ -28338,8 +28336,6 @@ ENDIF
     DstExternInputTypeData%BlPitchCom = SrcExternInputTypeData%BlPitchCom
     DstExternInputTypeData%HSSBrFrac = SrcExternInputTypeData%HSSBrFrac
     DstExternInputTypeData%LidarFocus = SrcExternInputTypeData%LidarFocus
-    DstExternInputTypeData%TTDspFA = SrcExternInputTypeData%TTDspFA
-    DstExternInputTypeData%TTDspSS = SrcExternInputTypeData%TTDspSS
     DstExternInputTypeData%PtfmSurge = SrcExternInputTypeData%PtfmSurge
     DstExternInputTypeData%PtfmSway = SrcExternInputTypeData%PtfmSway
     DstExternInputTypeData%PtfmHeave = SrcExternInputTypeData%PtfmHeave
@@ -28401,8 +28397,6 @@ ENDIF
       Re_BufSz   = Re_BufSz   + SIZE(InData%BlPitchCom)  ! BlPitchCom
       Re_BufSz   = Re_BufSz   + 1  ! HSSBrFrac
       Re_BufSz   = Re_BufSz   + SIZE(InData%LidarFocus)  ! LidarFocus
-      Re_BufSz   = Re_BufSz   + 1  ! TTDspFA
-      Re_BufSz   = Re_BufSz   + 1  ! TTDspSS
       Re_BufSz   = Re_BufSz   + 1  ! PtfmSurge
       Re_BufSz   = Re_BufSz   + 1  ! PtfmSway
       Re_BufSz   = Re_BufSz   + 1  ! PtfmHeave
@@ -28450,10 +28444,6 @@ ENDIF
       Re_Xferred   = Re_Xferred   + 1
       ReKiBuf ( Re_Xferred:Re_Xferred+(SIZE(InData%LidarFocus))-1 ) = PACK(InData%LidarFocus,.TRUE.)
       Re_Xferred   = Re_Xferred   + SIZE(InData%LidarFocus)
-      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%TTDspFA
-      Re_Xferred   = Re_Xferred   + 1
-      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%TTDspSS
-      Re_Xferred   = Re_Xferred   + 1
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%PtfmSurge
       Re_Xferred   = Re_Xferred   + 1
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%PtfmSway
@@ -28533,10 +28523,6 @@ ENDIF
       OutData%LidarFocus = UNPACK(ReKiBuf( Re_Xferred:Re_Xferred+(SIZE(OutData%LidarFocus))-1 ), mask1, 0.0_ReKi )
       Re_Xferred   = Re_Xferred   + SIZE(OutData%LidarFocus)
     DEALLOCATE(mask1)
-      OutData%TTDspFA = ReKiBuf( Re_Xferred )
-      Re_Xferred   = Re_Xferred + 1
-      OutData%TTDspSS = ReKiBuf( Re_Xferred )
-      Re_Xferred   = Re_Xferred + 1
       OutData%PtfmSurge = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
       OutData%PtfmSway = ReKiBuf( Re_Xferred )

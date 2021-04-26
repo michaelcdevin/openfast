@@ -108,7 +108,7 @@ IMPLICIT NONE
 ! =========  ED_InputFile  =======
   TYPE, PUBLIC :: ED_InputFile
     REAL(DbKi)  :: DT      !< Requested integration time for ElastoDyn [seconds]
-    REAL(ReKi)  :: DispMode      !< Displacement control mode [-]
+    REAL(ReKi)  :: HybridMode      !< Hybrid control mode [-]
     REAL(ReKi)  :: Gravity      !< Gravitational acceleration [m/s^2]
     LOGICAL  :: FlapDOF1      !< First flapwise blade mode DOF [-]
     LOGICAL  :: FlapDOF2      !< Second flapwise blade mode DOF [-]
@@ -564,7 +564,7 @@ IMPLICIT NONE
   TYPE, PUBLIC :: ED_ParameterType
     REAL(DbKi)  :: DT      !< Time step for continuous state integration & discrete state update [seconds]
     REAL(DbKi)  :: DT24      !< =DT/24 (used in loose coupling) [seconds]
-    INTEGER(IntKi)  :: DispMode      !< Displacement control mode [-]
+    INTEGER(IntKi)  :: HybridMode      !< Hybrid control mode [-]
     INTEGER(IntKi)  :: BldNodes      !< Number of blade nodes used in the analysis [-]
     INTEGER(IntKi)  :: TipNode      !< Index of the additional node located at the blade tip = BldNodes + 1 [-]
     INTEGER(IntKi)  :: NDOF      !< Number of total degrees of freedom (DOFs) [-]
@@ -823,14 +823,12 @@ IMPLICIT NONE
     REAL(ReKi)  :: YawMom      !< Torque transmitted through the yaw bearing [N-m]
     REAL(ReKi)  :: GenTrq      !< Electrical generator torque [N-m]
     REAL(ReKi)  :: HSSBrTrqC      !< Commanded HSS brake torque [N-m]
-    REAL(ReKi)  :: ExternalTTDspFA      !< Commanded fore-aft tower-top displacement from Simulink [meters]
-    REAL(ReKi)  :: ExternalTTDspSS      !< Commanded side-to-side tower-top displacement from Simulink [meters]
-    REAL(ReKi)  :: ExternalPtfmSurge      !< Commanded horizontal surge translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: ExternalPtfmSway      !< Commanded horizontal sway translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: ExternalPtfmHeave      !< Commanded vertical heave translational displacement of platform from Simulink [meters]
-    REAL(ReKi)  :: ExternalPtfmRoll      !< Commanded roll tilt rotational displacement of platform from Simulink [radians]
-    REAL(ReKi)  :: ExternalPtfmPitch      !< Commanded pitch tilt rotational displacement of platform from Simulink [radians]
-    REAL(ReKi)  :: ExternalPtfmYaw      !< Commanded yaw rotational displacement of platform from Simulink [radians]
+    REAL(ReKi)  :: ExternalPtfmSurge      !< Commanded horizontal surge translational displacement/force at platform from Simulink [meters]
+    REAL(ReKi)  :: ExternalPtfmSway      !< Commanded horizontal sway translational displacement/force at platform from Simulink [meters]
+    REAL(ReKi)  :: ExternalPtfmHeave      !< Commanded vertical heave translational displacement/force at of platform from Simulink [meters]
+    REAL(ReKi)  :: ExternalPtfmRoll      !< Commanded roll tilt rotational displacement/moment at platform from Simulink [radians]
+    REAL(ReKi)  :: ExternalPtfmPitch      !< Commanded pitch tilt rotational displacement/moment at platform from Simulink [radians]
+    REAL(ReKi)  :: ExternalPtfmYaw      !< Commanded yaw rotational displacement/moment at platform from Simulink [radians]
   END TYPE ED_InputType
 ! =======================
 ! =========  ED_OutputType  =======
@@ -3670,7 +3668,7 @@ ENDIF
    ErrStat = ErrID_None
    ErrMsg  = ""
     DstInputFileData%DT = SrcInputFileData%DT
-    DstInputFileData%DispMode = SrcInputFileData%DispMode
+    DstInputFileData%HybridMode = SrcInputFileData%HybridMode
     DstInputFileData%Gravity = SrcInputFileData%Gravity
     DstInputFileData%FlapDOF1 = SrcInputFileData%FlapDOF1
     DstInputFileData%FlapDOF2 = SrcInputFileData%FlapDOF2
@@ -4191,7 +4189,7 @@ ENDIF
   Db_BufSz  = 0
   Int_BufSz  = 0
       Db_BufSz   = Db_BufSz   + 1  ! DT
-      Re_BufSz   = Re_BufSz   + 1  ! DispMode
+      Re_BufSz   = Re_BufSz   + 1  ! HybridMode
       Re_BufSz   = Re_BufSz   + 1  ! Gravity
       Int_BufSz  = Int_BufSz  + 1  ! FlapDOF1
       Int_BufSz  = Int_BufSz  + 1  ! FlapDOF2
@@ -4515,7 +4513,7 @@ ENDIF
 
       DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) = InData%DT
       Db_Xferred   = Db_Xferred   + 1
-      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%DispMode
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%HybridMode
       Re_Xferred   = Re_Xferred   + 1
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%Gravity
       Re_Xferred   = Re_Xferred   + 1
@@ -5190,7 +5188,7 @@ ENDIF
   Int_Xferred  = 1
       OutData%DT = DbKiBuf( Db_Xferred ) 
       Db_Xferred   = Db_Xferred + 1
-      OutData%DispMode = ReKiBuf( Re_Xferred )
+      OutData%HybridMode = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
       OutData%Gravity = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
@@ -16645,7 +16643,7 @@ ENDIF
    ErrMsg  = ""
     DstParamData%DT = SrcParamData%DT
     DstParamData%DT24 = SrcParamData%DT24
-    DstParamData%DispMode = SrcParamData%DispMode
+    DstParamData%HybridMode = SrcParamData%HybridMode
     DstParamData%BldNodes = SrcParamData%BldNodes
     DstParamData%TipNode = SrcParamData%TipNode
     DstParamData%NDOF = SrcParamData%NDOF
@@ -18097,7 +18095,7 @@ ENDIF
   Int_BufSz  = 0
       Db_BufSz   = Db_BufSz   + 1  ! DT
       Db_BufSz   = Db_BufSz   + 1  ! DT24
-      Int_BufSz  = Int_BufSz  + 1  ! DispMode
+      Int_BufSz  = Int_BufSz  + 1  ! HybridMode
       Int_BufSz  = Int_BufSz  + 1  ! BldNodes
       Int_BufSz  = Int_BufSz  + 1  ! TipNode
       Int_BufSz  = Int_BufSz  + 1  ! NDOF
@@ -18703,7 +18701,7 @@ ENDIF
       Db_Xferred   = Db_Xferred   + 1
       DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) = InData%DT24
       Db_Xferred   = Db_Xferred   + 1
-      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%DispMode
+      IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%HybridMode
       Int_Xferred   = Int_Xferred   + 1
       IntKiBuf ( Int_Xferred:Int_Xferred+(1)-1 ) = InData%BldNodes
       Int_Xferred   = Int_Xferred   + 1
@@ -20280,7 +20278,7 @@ ENDIF
       Db_Xferred   = Db_Xferred + 1
       OutData%DT24 = DbKiBuf( Db_Xferred ) 
       Db_Xferred   = Db_Xferred + 1
-      OutData%DispMode = IntKiBuf( Int_Xferred ) 
+      OutData%HybridMode = IntKiBuf( Int_Xferred ) 
       Int_Xferred   = Int_Xferred + 1
       OutData%BldNodes = IntKiBuf( Int_Xferred ) 
       Int_Xferred   = Int_Xferred + 1
@@ -22734,8 +22732,6 @@ ENDIF
     DstInputData%YawMom = SrcInputData%YawMom
     DstInputData%GenTrq = SrcInputData%GenTrq
     DstInputData%HSSBrTrqC = SrcInputData%HSSBrTrqC
-    DstInputData%ExternalTTDspFA = SrcInputData%ExternalTTDspFA
-    DstInputData%ExternalTTDspSS = SrcInputData%ExternalTTDspSS
     DstInputData%ExternalPtfmSurge = SrcInputData%ExternalPtfmSurge
     DstInputData%ExternalPtfmSway = SrcInputData%ExternalPtfmSway
     DstInputData%ExternalPtfmHeave = SrcInputData%ExternalPtfmHeave
@@ -22912,8 +22908,6 @@ ENDIF
       Re_BufSz   = Re_BufSz   + 1  ! YawMom
       Re_BufSz   = Re_BufSz   + 1  ! GenTrq
       Re_BufSz   = Re_BufSz   + 1  ! HSSBrTrqC
-      Re_BufSz   = Re_BufSz   + 1  ! ExternalTTDspFA
-      Re_BufSz   = Re_BufSz   + 1  ! ExternalTTDspSS
       Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmSurge
       Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmSway
       Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmHeave
@@ -23139,10 +23133,6 @@ ENDIF
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%GenTrq
       Re_Xferred   = Re_Xferred   + 1
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%HSSBrTrqC
-      Re_Xferred   = Re_Xferred   + 1
-      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalTTDspFA
-      Re_Xferred   = Re_Xferred   + 1
-      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalTTDspSS
       Re_Xferred   = Re_Xferred   + 1
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmSurge
       Re_Xferred   = Re_Xferred   + 1
@@ -23479,10 +23469,6 @@ ENDIF
       OutData%GenTrq = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
       OutData%HSSBrTrqC = ReKiBuf( Re_Xferred )
-      Re_Xferred   = Re_Xferred + 1
-      OutData%ExternalTTDspFA = ReKiBuf( Re_Xferred )
-      Re_Xferred   = Re_Xferred + 1
-      OutData%ExternalTTDspSS = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
       OutData%ExternalPtfmSurge = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
@@ -25494,10 +25480,6 @@ END IF ! check if allocated
   u_out%GenTrq = u1%GenTrq + b0 * t_out
   b0 = -(u1%HSSBrTrqC - u2%HSSBrTrqC)/t(2)
   u_out%HSSBrTrqC = u1%HSSBrTrqC + b0 * t_out
-  b0 = -(u1%ExternalTTDspFA - u2%ExternalTTDspFA)/t(2)
-  u_out%ExternalTTDspFA = u1%ExternalTTDspFA + b0 * t_out
-  b0 = -(u1%ExternalTTDspSS - u2%ExternalTTDspSS)/t(2)
-  u_out%ExternalTTDspSS = u1%ExternalTTDspSS + b0 * t_out
   b0 = -(u1%ExternalPtfmSurge - u2%ExternalPtfmSurge)/t(2)
   u_out%ExternalPtfmSurge = u1%ExternalPtfmSurge + b0 * t_out
   b0 = -(u1%ExternalPtfmSway - u2%ExternalPtfmSway)/t(2)
@@ -25619,12 +25601,6 @@ END IF ! check if allocated
   b0 = (t(3)**2*(u1%HSSBrTrqC - u2%HSSBrTrqC) + t(2)**2*(-u1%HSSBrTrqC + u3%HSSBrTrqC))/(t(2)*t(3)*(t(2) - t(3)))
   c0 = ( (t(2)-t(3))*u1%HSSBrTrqC + t(3)*u2%HSSBrTrqC - t(2)*u3%HSSBrTrqC ) / (t(2)*t(3)*(t(2) - t(3)))
   u_out%HSSBrTrqC = u1%HSSBrTrqC + b0 * t_out + c0 * t_out**2
-  b0 = (t(3)**2*(u1%ExternalTTDspFA - u2%ExternalTTDspFA) + t(2)**2*(-u1%ExternalTTDspFA + u3%ExternalTTDspFA))/(t(2)*t(3)*(t(2) - t(3)))
-  c0 = ( (t(2)-t(3))*u1%ExternalTTDspFA + t(3)*u2%ExternalTTDspFA - t(2)*u3%ExternalTTDspFA ) / (t(2)*t(3)*(t(2) - t(3)))
-  u_out%ExternalTTDspFA = u1%ExternalTTDspFA + b0 * t_out + c0 * t_out**2
-  b0 = (t(3)**2*(u1%ExternalTTDspSS - u2%ExternalTTDspSS) + t(2)**2*(-u1%ExternalTTDspSS + u3%ExternalTTDspSS))/(t(2)*t(3)*(t(2) - t(3)))
-  c0 = ( (t(2)-t(3))*u1%ExternalTTDspSS + t(3)*u2%ExternalTTDspSS - t(2)*u3%ExternalTTDspSS ) / (t(2)*t(3)*(t(2) - t(3)))
-  u_out%ExternalTTDspSS = u1%ExternalTTDspSS + b0 * t_out + c0 * t_out**2
   b0 = (t(3)**2*(u1%ExternalPtfmSurge - u2%ExternalPtfmSurge) + t(2)**2*(-u1%ExternalPtfmSurge + u3%ExternalPtfmSurge))/(t(2)*t(3)*(t(2) - t(3)))
   c0 = ( (t(2)-t(3))*u1%ExternalPtfmSurge + t(3)*u2%ExternalPtfmSurge - t(2)*u3%ExternalPtfmSurge ) / (t(2)*t(3)*(t(2) - t(3)))
   u_out%ExternalPtfmSurge = u1%ExternalPtfmSurge + b0 * t_out + c0 * t_out**2
