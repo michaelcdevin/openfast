@@ -1220,12 +1220,20 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
    
    m_FAST%ExternInput%LidarFocus  = 1.0_ReKi  ! make this non-zero (until we add the initial position in the InflowWind input file)
    
-   m_FAST%ExternInput%PtfmSurge   = ED%Input(1)%ExternalPtfmSurge
-   m_FAST%ExternInput%PtfmSway    = ED%Input(1)%ExternalPtfmSway
-   m_FAST%ExternInput%PtfmHeave   = ED%Input(1)%ExternalPtfmHeave
-   m_FAST%ExternInput%PtfmPitch   = ED%Input(1)%ExternalPtfmPitch
-   m_FAST%ExternInput%PtfmRoll    = ED%Input(1)%ExternalPtfmRoll
-   m_FAST%ExternInput%PtfmYaw     = ED%Input(1)%ExternalPtfmYaw
+   ! @mcd: the only reason these external inputs are initialized like this instead of setting to zero is if initial platform displacements
+   ! are specified in the ElastoDyn input file when using force control
+   m_FAST%ExternInput%PtfmSurge      = ED%Input(1)%ExternalPtfmSurge
+   m_FAST%ExternInput%PtfmSway       = ED%Input(1)%ExternalPtfmSway
+   m_FAST%ExternInput%PtfmHeave      = ED%Input(1)%ExternalPtfmHeave
+   m_FAST%ExternInput%PtfmPitch      = ED%Input(1)%ExternalPtfmPitch
+   m_FAST%ExternInput%PtfmRoll       = ED%Input(1)%ExternalPtfmRoll
+   m_FAST%ExternInput%PtfmYaw        = ED%Input(1)%ExternalPtfmYaw
+   m_FAST%ExternInput%PtfmSurgeVel   = ED%Input(1)%ExternalPtfmSurgeVel
+   m_FAST%ExternInput%PtfmSwayVel    = ED%Input(1)%ExternalPtfmSwayVel
+   m_FAST%ExternInput%PtfmHeaveVel   = ED%Input(1)%ExternalPtfmHeaveVel
+   m_FAST%ExternInput%PtfmPitchVel   = ED%Input(1)%ExternalPtfmPitchVel
+   m_FAST%ExternInput%PtfmRollVel    = ED%Input(1)%ExternalPtfmRollVel
+   m_FAST%ExternInput%PtfmYawVel     = ED%Input(1)%ExternalPtfmYawVel
    
    !...............................................................................................................................
    ! Destroy initializion data

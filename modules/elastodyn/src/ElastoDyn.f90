@@ -1300,12 +1300,8 @@ END IF
    
    IF (p%HybridMode == HybridMode_FORCECTRL) THEN
       CALL SetCoordSy_hybrid( t, u, m%CoordSys_hybrid, m%RtHS_hybrid, u%BlPitchCom, p, x, ErrStat, ErrMsg )
-       IF (PRESENT(u_old)) THEN
-          CALL CalculateHybridMotions( p, u, x, m%CoordSys_hybrid, m%RtHS_hybrid, p%DT, u_old)
-       ELSE
-          CALL CalculateHybridMotions( p, u, x, m%CoordSys_hybrid, m%RtHS_hybrid)
-       END IF
-       CALL ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
+      CALL CalculateHybridMotions( p, u, x, m%CoordSys_hybrid, m%RtHS_hybrid)
+      CALL ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
    END IF
        
    
@@ -2141,16 +2137,14 @@ END SUBROUTINE SetCoordSy_hybrid
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine is used to calculate the positions stored in other states that are used in both the
 !! CalcOutput and CalcContStateDeriv routines.
-SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt, u_old)
+SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat )
 !..................................................................................................................................
 
       ! Passed variables
    TYPE(ED_ParameterType),       INTENT(IN   )  :: p           !< Parameters
    TYPE(ED_InputType),           INTENT(IN   )  :: u           !< Inputs at Time
-   TYPE(ED_InputType), OPTIONAL, INTENT(IN   )  :: u_old       !< Inputs at Time t-DT
    TYPE(ED_ContinuousStateType), INTENT(IN   )  :: x           !< Continuous states at Time
    TYPE(ED_CoordSys),            INTENT(IN   )  :: CoordSys    !< The coordinate systems that have been set for these states/time
-   REAL(DbKi), OPTIONAL,         INTENT(IN   )  :: dt          !< Time step
    TYPE(ED_RtHndSide),           INTENT(INOUT)  :: RtHSdat     !< data from the RtHndSid module (contains positions to be set)
 
          !Local variables
@@ -2189,13 +2183,6 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt, u_old)
    REAL(ReKi)                   :: TmpVec3   (3)                                   ! A temporary vector used in various computations.
    REAL(ReKi)                   :: TmpVec4   (3)                                   ! A temporary vector used in various computations.
    
-   REAL(ReKi)                   :: PtfmSurgeVel
-   REAL(ReKi)                   :: PtfmSwayVel
-   REAL(ReKi)                   :: PtfmHeaveVel
-   REAL(ReKi)                   :: PtfmRollVel
-   REAL(ReKi)                   :: PtfmPitchVel
-   REAL(ReKi)                   :: PtfmYawVel
-   
    REAL(ReKi)                   :: AngVelMat(3)
    
    REAL(R8Ki)                   :: rK        (3)                                   ! Position vector from inertial frame origin to tail fin center of pressure (point K).
@@ -2207,24 +2194,7 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt, u_old)
    
    
    
-! @mcd: allocate velocity terms in place of x%QDT's
-   IF (PRESENT(u_old)) THEN
-      PtfmSurgeVel    =  (u%ExternalPtfmSurge     - u_old%ExternalPtfmSurge) / dt
-      PtfmSwayVel     =  (u%ExternalPtfmSway      - u_old%ExternalPtfmSway)  / dt
-      PtfmHeaveVel    =  (u%ExternalPtfmHeave     - u_old%ExternalPtfmHeave) / dt
-      PtfmRollVel     =  (u%ExternalPtfmRoll*D2R  - u_old%ExternalPtfmRoll*D2R)  / dt
-      PtfmPitchVel    =  (u%ExternalPtfmPitch*D2R - u_old%ExternalPtfmPitch*D2R) / dt
-      PtfmYawVel      =  (u%ExternalPtfmYaw*D2R   - u_old%ExternalPtfmYaw*D2R)   / dt
-   ELSE
-      PtfmSurgeVel    =  0.0_ReKi
-      PtfmSwayVel     =  0.0_ReKi
-      PtfmHeaveVel    =  0.0_ReKi
-      PtfmRollVel     =  0.0_ReKi
-      PtfmPitchVel    =  0.0_ReKi
-      PtfmYawVel      =  0.0_ReKi
-   END IF
-   
-   AngVelMat   = (/ PtfmRollVel, PtfmPitchVel, PtfmYawVel /)
+   AngVelMat   = (/ u%ExternalPtfmRollVel*D2R, u%ExternalPtfmPitchVel*D2R, u%ExternalPtfmYawVel*D2R /)
    
 ! ---------------------------------------   
 !   Parts from CalculatePositions
@@ -2367,9 +2337,9 @@ SUBROUTINE CalculateHybridMotions( p, u, x, CoordSys, RtHSdat, dt, u_old)
    RtHSdat%PAngVelEX(DOF_R   ,0,:) =  CoordSys%z1
    RtHSdat%PAngVelEX(DOF_P   ,0,:) = -CoordSys%z3
    RtHSdat%PAngVelEX(DOF_Y   ,0,:) =  CoordSys%z2
-   RtHSdat%AngVelEX                =                     PtfmRollVel*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
-                                                       + PtfmPitchVel*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
-                                                       + PtfmYawVel*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
+   RtHSdat%AngVelEX                =                     u%ExternalPtfmRollVel*D2R*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
+                                                       + u%ExternalPtfmPitchVel*D2R*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
+                                                       + u%ExternalPtfmYawVel*D2R*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
    RtHSdat%AngPosEX                =                     u%ExternalPtfmRoll*D2R*RtHSdat%PAngVelEX(DOF_R   ,0,:) &
                                                        + u%ExternalPtfmPitch*D2R*RtHSdat%PAngVelEX(DOF_P   ,0,:) &
                                                        + u%ExternalPtfmYaw*D2R*RtHSdat%PAngVelEX(DOF_Y   ,0,:)
@@ -2609,9 +2579,9 @@ ENDIF
    RtHSdat%PLinVelEZ(DOF_Sw  ,0,:) = -CoordSys%z3
    RtHSdat%PLinVelEZ(DOF_Hv  ,0,:) =  CoordSys%z2
 
-   RtHSdat%LinVelEZ                =   PtfmSurgeVel*RtHSdat%PLinVelEZ(DOF_Sg  ,0,:) &
-                                     + PtfmSwayVel *RtHSdat%PLinVelEZ(DOF_Sw  ,0,:) &
-                                     + PtfmHeaveVel*RtHSdat%PLinVelEZ(DOF_Hv  ,0,:)
+   RtHSdat%LinVelEZ                =   u%ExternalPtfmSurgeVel*RtHSdat%PLinVelEZ(DOF_Sg  ,0,:) &
+                                     + u%ExternalPtfmSwayVel *RtHSdat%PLinVelEZ(DOF_Sw  ,0,:) &
+                                     + u%ExternalPtfmHeaveVel*RtHSdat%PLinVelEZ(DOF_Hv  ,0,:)
 
 
    RtHSdat%PLinVelEY(       :,:,:) = RtHSdat%PLinVelEZ(:,:,:)
@@ -3080,7 +3050,6 @@ SUBROUTINE ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, E
    
    
       ! Local variables
-   REAL(DbKi)  :: tt_disp
    INTEGER(IntKi)               :: J, J2                                           ! Loops through nodes / elements
    INTEGER(IntKi)               :: K                                               ! Loops through blades
    INTEGER(IntKi)               :: NodeNum                                         ! Mesh node number for given blade/node
@@ -3257,7 +3226,6 @@ SUBROUTINE ED_CalcOutput_hybrid( t, u, p, x, xd, z, OtherState, y, m, ErrStat, E
    J = p%TwrNodes+1
    
    y%TowerLn2Mesh_hybrid%TranslationDisp(1,J) =     m%RtHS_hybrid%rO(1) - y%TowerLn2Mesh_hybrid%Position(1,J)
-   tt_disp = y%TowerLn2Mesh_hybrid%TranslationDisp(1,J)
    y%TowerLn2Mesh_hybrid%TranslationDisp(2,J) = -1.*m%RtHS_hybrid%rO(3) - y%TowerLn2Mesh_hybrid%Position(2,J)
    y%TowerLn2Mesh_hybrid%TranslationDisp(3,J) =     m%RtHS_hybrid%rO(2) - y%TowerLn2Mesh_hybrid%Position(3,J) + p%PtfmRefzt
    
@@ -10766,6 +10734,8 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
 
       u%BlPitchCom = 0.0_ReKi
       
+      ! @mcd: I'm not calling the hybrid solvers here since the external values aren't initialized yet,
+      !       and these values either match InputFileData or are zero anyway.
       ! set the coordinate system variables:
    CALL SetCoordSy( -p%DT, m%CoordSys, m%RtHS, u%BlPitchCom, p, x_tmp, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -10788,12 +10758,18 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
    ! using force control. Otherwise, initialize to zero.
    !.......................................................
    IF ( p%HybridMode == HybridMode_FORCECTRL) THEN
-      u%ExternalPtfmSurge = InputFileData%PtfmSurge
-      u%ExternalPtfmSway  = InputFileData%PtfmSway
-      u%ExternalPtfmHeave = InputFileData%PtfmHeave
-      u%ExternalPtfmRoll  = InputFileData%PtfmRoll
-      u%ExternalPtfmPitch = InputFileData%PtfmPitch
-      u%ExternalPtfmYaw   = InputFileData%PtfmYaw
+      u%ExternalPtfmSurge    = InputFileData%PtfmSurge
+      u%ExternalPtfmSway     = InputFileData%PtfmSway
+      u%ExternalPtfmHeave    = InputFileData%PtfmHeave
+      u%ExternalPtfmRoll     = InputFileData%PtfmRoll
+      u%ExternalPtfmPitch    = InputFileData%PtfmPitch
+      u%ExternalPtfmYaw      = InputFileData%PtfmYaw
+      u%ExternalPtfmSurgeVel = 0.0_ReKi
+      u%ExternalPtfmSwayVel  = 0.0_ReKi
+      u%ExternalPtfmHeaveVel = 0.0_ReKi
+      u%ExternalPtfmPitchVel = 0.0_ReKi
+      u%ExternalPtfmRollVel  = 0.0_ReKi
+      u%ExternalPtfmYawVel   = 0.0_ReKi
    ELSE
       u%ExternalPtfmSurge = 0.0_ReKi
       u%ExternalPtfmSway  = 0.0_ReKi
@@ -10801,6 +10777,12 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
       u%ExternalPtfmPitch = 0.0_ReKi
       u%ExternalPtfmRoll  = 0.0_ReKi
       u%ExternalPtfmYaw   = 0.0_ReKi
+      u%ExternalPtfmSurgeVel = 0.0_ReKi
+      u%ExternalPtfmSwayVel  = 0.0_ReKi
+      u%ExternalPtfmHeaveVel = 0.0_ReKi
+      u%ExternalPtfmPitchVel = 0.0_ReKi
+      u%ExternalPtfmRollVel  = 0.0_ReKi
+      u%ExternalPtfmYawVel   = 0.0_ReKi
    ENDIF
    
    !.......................................................

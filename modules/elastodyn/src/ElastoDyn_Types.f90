@@ -829,6 +829,12 @@ IMPLICIT NONE
     REAL(ReKi)  :: ExternalPtfmRoll      !< Commanded roll tilt rotational displacement/moment at platform from Simulink [radians]
     REAL(ReKi)  :: ExternalPtfmPitch      !< Commanded pitch tilt rotational displacement/moment at platform from Simulink [radians]
     REAL(ReKi)  :: ExternalPtfmYaw      !< Commanded yaw rotational displacement/moment at platform from Simulink [radians]
+    REAL(ReKi)  :: ExternalPtfmSurgeVel      !< Commanded horizontal surge translational velocity at platform from Simulink [m/s]
+    REAL(ReKi)  :: ExternalPtfmSwayVel      !< Commanded horizontal sway translational velocity at platform from Simulink [m/s]
+    REAL(ReKi)  :: ExternalPtfmHeaveVel      !< Commanded vertical heave translational velocity at of platform from Simulink [m/s]
+    REAL(ReKi)  :: ExternalPtfmRollVel      !< Commanded roll tilt rotational velocity at platform from Simulink [rad/s]
+    REAL(ReKi)  :: ExternalPtfmPitchVel      !< Commanded pitch tilt rotational velocity at platform from Simulink [rad/s]
+    REAL(ReKi)  :: ExternalPtfmYawVel      !< Commanded yaw rotational velocity at platform from Simulink [rad/s]
   END TYPE ED_InputType
 ! =======================
 ! =========  ED_OutputType  =======
@@ -22738,6 +22744,12 @@ ENDIF
     DstInputData%ExternalPtfmRoll = SrcInputData%ExternalPtfmRoll
     DstInputData%ExternalPtfmPitch = SrcInputData%ExternalPtfmPitch
     DstInputData%ExternalPtfmYaw = SrcInputData%ExternalPtfmYaw
+    DstInputData%ExternalPtfmSurgeVel = SrcInputData%ExternalPtfmSurgeVel
+    DstInputData%ExternalPtfmSwayVel = SrcInputData%ExternalPtfmSwayVel
+    DstInputData%ExternalPtfmHeaveVel = SrcInputData%ExternalPtfmHeaveVel
+    DstInputData%ExternalPtfmRollVel = SrcInputData%ExternalPtfmRollVel
+    DstInputData%ExternalPtfmPitchVel = SrcInputData%ExternalPtfmPitchVel
+    DstInputData%ExternalPtfmYawVel = SrcInputData%ExternalPtfmYawVel
  END SUBROUTINE ED_CopyInput
 
  SUBROUTINE ED_DestroyInput( InputData, ErrStat, ErrMsg )
@@ -22914,6 +22926,12 @@ ENDIF
       Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmRoll
       Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmPitch
       Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmYaw
+      Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmSurgeVel
+      Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmSwayVel
+      Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmHeaveVel
+      Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmRollVel
+      Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmPitchVel
+      Re_BufSz   = Re_BufSz   + 1  ! ExternalPtfmYawVel
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -23145,6 +23163,18 @@ ENDIF
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmPitch
       Re_Xferred   = Re_Xferred   + 1
       ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmYaw
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmSurgeVel
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmSwayVel
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmHeaveVel
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmRollVel
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmPitchVel
+      Re_Xferred   = Re_Xferred   + 1
+      ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) = InData%ExternalPtfmYawVel
       Re_Xferred   = Re_Xferred   + 1
  END SUBROUTINE ED_PackInput
 
@@ -23481,6 +23511,18 @@ ENDIF
       OutData%ExternalPtfmPitch = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
       OutData%ExternalPtfmYaw = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%ExternalPtfmSurgeVel = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%ExternalPtfmSwayVel = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%ExternalPtfmHeaveVel = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%ExternalPtfmRollVel = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%ExternalPtfmPitchVel = ReKiBuf( Re_Xferred )
+      Re_Xferred   = Re_Xferred + 1
+      OutData%ExternalPtfmYawVel = ReKiBuf( Re_Xferred )
       Re_Xferred   = Re_Xferred + 1
  END SUBROUTINE ED_UnPackInput
 
@@ -25492,6 +25534,18 @@ END IF ! check if allocated
   u_out%ExternalPtfmPitch = u1%ExternalPtfmPitch + b0 * t_out
   b0 = -(u1%ExternalPtfmYaw - u2%ExternalPtfmYaw)/t(2)
   u_out%ExternalPtfmYaw = u1%ExternalPtfmYaw + b0 * t_out
+  b0 = -(u1%ExternalPtfmSurgeVel - u2%ExternalPtfmSurgeVel)/t(2)
+  u_out%ExternalPtfmSurgeVel = u1%ExternalPtfmSurgeVel + b0 * t_out
+  b0 = -(u1%ExternalPtfmSwayVel - u2%ExternalPtfmSwayVel)/t(2)
+  u_out%ExternalPtfmSwayVel = u1%ExternalPtfmSwayVel + b0 * t_out
+  b0 = -(u1%ExternalPtfmHeaveVel - u2%ExternalPtfmHeaveVel)/t(2)
+  u_out%ExternalPtfmHeaveVel = u1%ExternalPtfmHeaveVel + b0 * t_out
+  b0 = -(u1%ExternalPtfmRollVel - u2%ExternalPtfmRollVel)/t(2)
+  u_out%ExternalPtfmRollVel = u1%ExternalPtfmRollVel + b0 * t_out
+  b0 = -(u1%ExternalPtfmPitchVel - u2%ExternalPtfmPitchVel)/t(2)
+  u_out%ExternalPtfmPitchVel = u1%ExternalPtfmPitchVel + b0 * t_out
+  b0 = -(u1%ExternalPtfmYawVel - u2%ExternalPtfmYawVel)/t(2)
+  u_out%ExternalPtfmYawVel = u1%ExternalPtfmYawVel + b0 * t_out
  END SUBROUTINE ED_Input_ExtrapInterp1
 
 
@@ -25619,6 +25673,24 @@ END IF ! check if allocated
   b0 = (t(3)**2*(u1%ExternalPtfmYaw - u2%ExternalPtfmYaw) + t(2)**2*(-u1%ExternalPtfmYaw + u3%ExternalPtfmYaw))/(t(2)*t(3)*(t(2) - t(3)))
   c0 = ( (t(2)-t(3))*u1%ExternalPtfmYaw + t(3)*u2%ExternalPtfmYaw - t(2)*u3%ExternalPtfmYaw ) / (t(2)*t(3)*(t(2) - t(3)))
   u_out%ExternalPtfmYaw = u1%ExternalPtfmYaw + b0 * t_out + c0 * t_out**2
+  b0 = (t(3)**2*(u1%ExternalPtfmSurgeVel - u2%ExternalPtfmSurgeVel) + t(2)**2*(-u1%ExternalPtfmSurgeVel + u3%ExternalPtfmSurgeVel))/(t(2)*t(3)*(t(2) - t(3)))
+  c0 = ( (t(2)-t(3))*u1%ExternalPtfmSurgeVel + t(3)*u2%ExternalPtfmSurgeVel - t(2)*u3%ExternalPtfmSurgeVel ) / (t(2)*t(3)*(t(2) - t(3)))
+  u_out%ExternalPtfmSurgeVel = u1%ExternalPtfmSurgeVel + b0 * t_out + c0 * t_out**2
+  b0 = (t(3)**2*(u1%ExternalPtfmSwayVel - u2%ExternalPtfmSwayVel) + t(2)**2*(-u1%ExternalPtfmSwayVel + u3%ExternalPtfmSwayVel))/(t(2)*t(3)*(t(2) - t(3)))
+  c0 = ( (t(2)-t(3))*u1%ExternalPtfmSwayVel + t(3)*u2%ExternalPtfmSwayVel - t(2)*u3%ExternalPtfmSwayVel ) / (t(2)*t(3)*(t(2) - t(3)))
+  u_out%ExternalPtfmSwayVel = u1%ExternalPtfmSwayVel + b0 * t_out + c0 * t_out**2
+  b0 = (t(3)**2*(u1%ExternalPtfmHeaveVel - u2%ExternalPtfmHeaveVel) + t(2)**2*(-u1%ExternalPtfmHeaveVel + u3%ExternalPtfmHeaveVel))/(t(2)*t(3)*(t(2) - t(3)))
+  c0 = ( (t(2)-t(3))*u1%ExternalPtfmHeaveVel + t(3)*u2%ExternalPtfmHeaveVel - t(2)*u3%ExternalPtfmHeaveVel ) / (t(2)*t(3)*(t(2) - t(3)))
+  u_out%ExternalPtfmHeaveVel = u1%ExternalPtfmHeaveVel + b0 * t_out + c0 * t_out**2
+  b0 = (t(3)**2*(u1%ExternalPtfmRollVel - u2%ExternalPtfmRollVel) + t(2)**2*(-u1%ExternalPtfmRollVel + u3%ExternalPtfmRollVel))/(t(2)*t(3)*(t(2) - t(3)))
+  c0 = ( (t(2)-t(3))*u1%ExternalPtfmRollVel + t(3)*u2%ExternalPtfmRollVel - t(2)*u3%ExternalPtfmRollVel ) / (t(2)*t(3)*(t(2) - t(3)))
+  u_out%ExternalPtfmRollVel = u1%ExternalPtfmRollVel + b0 * t_out + c0 * t_out**2
+  b0 = (t(3)**2*(u1%ExternalPtfmPitchVel - u2%ExternalPtfmPitchVel) + t(2)**2*(-u1%ExternalPtfmPitchVel + u3%ExternalPtfmPitchVel))/(t(2)*t(3)*(t(2) - t(3)))
+  c0 = ( (t(2)-t(3))*u1%ExternalPtfmPitchVel + t(3)*u2%ExternalPtfmPitchVel - t(2)*u3%ExternalPtfmPitchVel ) / (t(2)*t(3)*(t(2) - t(3)))
+  u_out%ExternalPtfmPitchVel = u1%ExternalPtfmPitchVel + b0 * t_out + c0 * t_out**2
+  b0 = (t(3)**2*(u1%ExternalPtfmYawVel - u2%ExternalPtfmYawVel) + t(2)**2*(-u1%ExternalPtfmYawVel + u3%ExternalPtfmYawVel))/(t(2)*t(3)*(t(2) - t(3)))
+  c0 = ( (t(2)-t(3))*u1%ExternalPtfmYawVel + t(3)*u2%ExternalPtfmYawVel - t(2)*u3%ExternalPtfmYawVel ) / (t(2)*t(3)*(t(2) - t(3)))
+  u_out%ExternalPtfmYawVel = u1%ExternalPtfmYawVel + b0 * t_out + c0 * t_out**2
  END SUBROUTINE ED_Input_ExtrapInterp2
 
 

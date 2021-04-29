@@ -825,6 +825,12 @@ typedef	^	InputType	ReKi	ExternalPtfmHeave	-	-	-	"Commanded vertical heave trans
 typedef	^	InputType	ReKi	ExternalPtfmRoll	-	-	-	"Commanded roll tilt rotational displacement/moment at platform from Simulink"	radians
 typedef	^	InputType	ReKi	ExternalPtfmPitch	-	-	-	"Commanded pitch tilt rotational displacement/moment at platform from Simulink"	radians
 typedef	^	InputType	ReKi	ExternalPtfmYaw	-	-	-	"Commanded yaw rotational displacement/moment at platform from Simulink"	radians
+typedef	^	InputType	ReKi	ExternalPtfmSurgeVel	-	-	-	"Commanded horizontal surge translational velocity at platform from Simulink"	m/s
+typedef	^	InputType	ReKi	ExternalPtfmSwayVel	-	-	-	"Commanded horizontal sway translational velocity at platform from Simulink"	m/s
+typedef	^	InputType	ReKi	ExternalPtfmHeaveVel	-	-	-	"Commanded vertical heave translational velocity at of platform from Simulink"	m/s
+typedef	^	InputType	ReKi	ExternalPtfmRollVel	-	-	-	"Commanded roll tilt rotational velocity at platform from Simulink"	rad/s
+typedef	^	InputType	ReKi	ExternalPtfmPitchVel	-	-	-	"Commanded pitch tilt rotational velocity at platform from Simulink"	rad/s
+typedef	^	InputType	ReKi	ExternalPtfmYawVel	-	-	-	"Commanded yaw rotational velocity at platform from Simulink"	rad/s
 
 # ..... Outputs ...................................................................................................................
 # Define outputs that are contained on the mesh here:

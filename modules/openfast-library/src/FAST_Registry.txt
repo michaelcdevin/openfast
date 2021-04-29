@@ -476,6 +476,12 @@ typedef	^	FAST_ExternInputType	ReKi	PtfmHeave	-	-	-	"Heave (zi-direction) transl
 typedef	^	FAST_ExternInputType	ReKi	PtfmRoll	-	-	-	"Roll (xi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode)"
 typedef	^	FAST_ExternInputType	ReKi	PtfmPitch	-	-	-	"Pitch (yi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode)"
 typedef	^	FAST_ExternInputType	ReKi	PtfmYaw	-	-	-	"Yaw (zi-direction) rotational displacement or hydrodynamic moment of platform from physical model (depending on hybrid mode)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmSurgeVel	-	-	-	"Surge (xi-direction) translational velocity of platform from physical model (for force control)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmSwayVel	-	-	-	"Sway (yi-direction) translational velocity of platform from physical model (for force control)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmHeaveVel	-	-	-	"Heave (zi-direction) translational velocity of platform from physical model (for force control)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmRollVel	-	-	-	"Roll (xi-direction) rotational velocity of platform from physical model (for force control)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmPitchVel	-	-	-	"Pitch (yi-direction) rotational velocity of platform from physical model (for force control)"
+typedef	^	FAST_ExternInputType	ReKi	PtfmYawVel	-	-	-	"Yaw (zi-direction) rotational velocity of platform from physical model (for force control)"
 
 # ..... FAST_MiscVarType data .......................................................................................................
 typedef	FAST	FAST_MiscVarType	DbKi	TiLstPrn	-	-	-	"The simulation time of the last print (to file)"	(s)

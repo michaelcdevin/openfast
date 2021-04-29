@@ -280,7 +280,7 @@ SUBROUTINE ED_SetExternalInputs( p_FAST, m_FAST, u_ED, HybridMode )
    INTEGER(IntKi),                   INTENT(IN   )  :: HybridMode   !< Hybrid control mode (from ElastoDyn input file)
    
    
-   IF ( HybridMode == 1 ) THEN   ! Displacement control (force inputs, displacement outputs)
+   IF ( HybridMode == 1 ) THEN   ! Displacement control (force inputs, displacement outputs) -- inputs 7-12 are ignored (@mcd: TODO fix this later)
       u_ED%PlatformPtMesh%Force(1,1)   =  m_FAST%ExternInput%PtfmSurge
       u_ED%PlatformPtMesh%Force(2,1)   =  m_FAST%ExternInput%PtfmSway
       u_ED%PlatformPtMesh%Force(3,1)   =  m_FAST%ExternInput%PtfmHeave
@@ -288,12 +288,18 @@ SUBROUTINE ED_SetExternalInputs( p_FAST, m_FAST, u_ED, HybridMode )
       u_ED%PlatformPtMesh%Moment(2,1) =  m_FAST%ExternInput%PtfmPitch
       u_ED%PlatformPtMesh%Moment(3,1) =  m_FAST%ExternInput%PtfmYaw
    ELSEIF ( HybridMode == 2 ) THEN   ! Force control (displacement inputs, force outputs)
-      u_ED%ExternalPtfmSurge   =  m_FAST%ExternInput%PtfmSurge
-      u_ED%ExternalPtfmSway    =  m_FAST%ExternInput%PtfmSway
-      u_ED%ExternalPtfmHeave   =  m_FAST%ExternInput%PtfmHeave
-      u_ED%ExternalPtfmRoll    =  m_FAST%ExternInput%PtfmRoll
-      u_ED%ExternalPtfmPitch   =  m_FAST%ExternInput%PtfmPitch
-      u_ED%ExternalPtfmYaw     =  m_FAST%ExternInput%PtfmYaw
+      u_ED%ExternalPtfmSurge      =  m_FAST%ExternInput%PtfmSurge
+      u_ED%ExternalPtfmSway       =  m_FAST%ExternInput%PtfmSway
+      u_ED%ExternalPtfmHeave      =  m_FAST%ExternInput%PtfmHeave
+      u_ED%ExternalPtfmRoll       =  m_FAST%ExternInput%PtfmRoll
+      u_ED%ExternalPtfmPitch      =  m_FAST%ExternInput%PtfmPitch
+      u_ED%ExternalPtfmYaw        =  m_FAST%ExternInput%PtfmYaw
+      u_ED%ExternalPtfmSurgeVel   =  m_FAST%ExternInput%PtfmSurgeVel
+      u_ED%ExternalPtfmSwayVel    =  m_FAST%ExternInput%PtfmSwayVel
+      u_ED%ExternalPtfmHeaveVel   =  m_FAST%ExternInput%PtfmHeaveVel
+      u_ED%ExternalPtfmRollVel    =  m_FAST%ExternInput%PtfmRollVel
+      u_ED%ExternalPtfmPitchVel   =  m_FAST%ExternInput%PtfmPitchVel
+      u_ED%ExternalPtfmYawVel     =  m_FAST%ExternInput%PtfmYawVel
    END IF
       
 END SUBROUTINE ED_SetExternalInputs
