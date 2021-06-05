@@ -470,7 +470,7 @@ SUBROUTINE ED_UpdateHybridMotions( t, u, p, x, ErrStat, ErrMsg )
    REAL(DbKi),                   INTENT(IN   )  :: t           !< Current simulation time in seconds
    TYPE(ED_InputType),           INTENT(IN   )  :: u           !< Inputs at Time t
    TYPE(ED_ParameterType),       INTENT(IN   )  :: p           !< Parameters
-   TYPE(ED_ContinuousStateType), INTENT(IN   )  :: x           !< Continuous states at t
+   TYPE(ED_ContinuousStateType), INTENT(INOUT)  :: x           !< Continuous states at t
    
    INTEGER(IntKi),               INTENT(  OUT)  :: ErrStat     !< Error status of the operation
    CHARACTER(*),                 INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
@@ -8181,19 +8181,19 @@ SUBROUTINE FillAugMat( p, x, CoordSys, u, HSSBrTrq, RtHSdat, AugMat )
    REAL(R8Ki),                   INTENT(OUT)    :: AugMat(:,:) !< the return matrix 
    
       ! Local variables
-   REAL(ReKi)                   :: XInerDyP                                        ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the platform
-   REAL(ReKi)                   :: NInerDyP                                        ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the nacelle
-   REAL(ReKi)                   :: RInerDyP                                        ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the rear furl
-   REAL(ReKi)                   :: HInerDyP                                        ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the hub
-   REAL(ReKi)                   :: AInerDyP                                        ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the tail furl
-   REAL(ReKi)                   :: GInerDyP                                        ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the generator
-   REAL(ReKi)                   :: XInerDy                                         ! A temporary value for the dot product of the inertia dyadic and angular velocity of the platform
-   REAL(ReKi)                   :: NInerDy                                         ! A temporary value for the dot product of the inertia dyadic and angular velocity of the nacelle
-   REAL(ReKi)                   :: RInerDy                                         ! A temporary value for the dot product of the inertia dyadic and angular velocity of the real furl
-   REAL(ReKi)                   :: HInerDy                                         ! A temporary value for the dot product of the inertia dyadic and angular velocity of the hub
-   REAL(ReKi)                   :: AInerDy                                         ! A temporary value for the dot product of the inertia dyadic and angular velocity of the tail furl
-   REAL(ReKi)                   :: GInerDy                                         ! A temporary value for the dot product of the inertia dyadic and angular velocity of the generator
-   REAL(ReKi)                   :: TTmpVec1  (3                                    ! A temporary vector used in computations of the tower contributions to the platform cells.
+   REAL(ReKi)                   :: XInerDyP  (3)                                   ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the platform
+   REAL(ReKi)                   :: NInerDyP  (3)                                   ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the nacelle
+   REAL(ReKi)                   :: RInerDyP  (3)                                   ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the rear furl
+   REAL(ReKi)                   :: HInerDyP  (3)                                   ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the hub
+   REAL(ReKi)                   :: AInerDyP  (3)                                   ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the tail furl
+   REAL(ReKi)                   :: GInerDyP  (3)                                   ! A temporary value for the dot product of the inertia dyadic and partial angular velocity of the generator
+   REAL(ReKi)                   :: XInerDy   (3)                                   ! A temporary value for the dot product of the inertia dyadic and angular velocity of the platform
+   REAL(ReKi)                   :: NInerDy   (3)                                   ! A temporary value for the dot product of the inertia dyadic and angular velocity of the nacelle
+   REAL(ReKi)                   :: RInerDy   (3)                                  ! A temporary value for the dot product of the inertia dyadic and angular velocity of the real furl
+   REAL(ReKi)                   :: HInerDy   (3)                                   ! A temporary value for the dot product of the inertia dyadic and angular velocity of the hub
+   REAL(ReKi)                   :: AInerDy   (3)                                   ! A temporary value for the dot product of the inertia dyadic and angular velocity of the tail furl
+   REAL(ReKi)                   :: GInerDy   (3)                                   ! A temporary value for the dot product of the inertia dyadic and angular velocity of the generator
+   REAL(ReKi)                   :: TTmpVec1  (3)                                   ! A temporary vector used in computations of the tower contributions to the platform cells.
    REAL(ReKi)                   :: TTmpVec2  (3)                                   ! A temporary vector used in computations of the tower contributions to the platform cells.
    REAL(ReKi)                   :: XTmpVec   (3)                                   ! A temporary vector used in computations of the platform contributions to the platform cells.
    REAL(ReKi)                   :: NTmpVec   (3)                                   ! A temporary vector used in computations of the nacelle contributions to the platform cells.
@@ -8565,7 +8565,7 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
            + p%PtfmPIner*CoordSys%a3*DOT_PRODUCT( CoordSys%a3, RtHSdat%PAngVelEX(p%DOFs%PYE(L),0,:) )
          
          AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) = AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) + &
-             p%PtfmMass*DOT_PRODUCT(PLinVelEY(p%DOFs%PYE(I)), PLinVelEY(p%DOFs%PYE(L),0,:)) + DOT_PRODUCT(PAngVelEX(p%DOFs%PYE(I),0,:), XInerDyP)
+             p%PtfmMass*DOT_PRODUCT(RtHSdat%PLinVelEY(p%DOFs%PYE(I),0,:), RtHSdat%PLinVelEY(p%DOFs%PYE(L),0,:)) + DOT_PRODUCT(RtHSdat%PAngVelEX(p%DOFs%PYE(I),0,:), XInerDyP)
          
          !..................
          ! [C(q,t)]N
@@ -8573,30 +8573,30 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
          NInerDyP = p%Nacd2Iner*CoordSys%d2*DOT_PRODUCT( CoordSys%d2, RtHSdat%PAngVelEN (p%DOFs%PYE(L),0,:) )
          
          AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) = AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) + &
-             p%NacMass*DOT_PRODUCT(PLinVelEU(p%DOFs%PYE(I),0,:), PLinVelEU(p%DOFs%PYE(L),0,:) ) + DOT_PRODUCT(PAngVelEN(p%DOFs%PYE(I),0,:), NInerDyP)
+             p%NacMass*DOT_PRODUCT(RtHSdat%PLinVelEU(p%DOFs%PYE(I),0,:), RtHSdat%PLinVelEU(p%DOFs%PYE(L),0,:) ) + DOT_PRODUCT(RtHSdat%PAngVelEN(p%DOFs%PYE(I),0,:), NInerDyP)
          
          !..................
          ! [C(q,t)]R
          !..................
          RInerDyP = p%RrfaIner*CoordSys%rfa*DOT_PRODUCT( CoordSys%rfa, RtHSdat%PAngVelER(p%DOFs%PYE(L),0,:) )
          AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) = AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) + &
-             p%RFrlMass*DOT_PRODUCT(PLinVelED(p%DOFs%PYE(I),0,:), PLinVelED(p%DOFs%PYE(L),0,:) ) + DOT_PRODUCT(PAngVelER(p%DOFs%PYE(I),0,:), RInerDyP)
+             p%RFrlMass*DOT_PRODUCT(RtHSdat%PLinVelED(p%DOFs%PYE(I),0,:), RtHSdat%PLinVelED(p%DOFs%PYE(L),0,:) ) + DOT_PRODUCT(RtHSdat%PAngVelER(p%DOFs%PYE(I),0,:), RInerDyP)
          
          !..................
          ! [C(q,t)]H
          !..................
-         HInerDyP = p%Hubg1Iner*CoordSys%g1*DOT_PRODUCT( CoordSys%g1, RtHSdat%PAngVelEH(p%DOFs%PYE(L),0,:) &
-            + p%Hubg2Iner*CoordSys%g2*DOT_PRODUCT( CoordSys%g2, RtHSdat%PAngVelEH(p%DOFs%PYE(L),0,:)
+         HInerDyP = p%Hubg1Iner*CoordSys%g1*DOT_PRODUCT( CoordSys%g1, RtHSdat%PAngVelEH(p%DOFs%PYE(L),0,:) ) + &
+            p%Hubg2Iner*CoordSys%g2*DOT_PRODUCT( CoordSys%g2, RtHSdat%PAngVelEH(p%DOFs%PYE(L),0,:) )
          AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) = AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) + &
-             p%HubMass*DOT_PRODUCT(PLinVelEC(p%DOFs%PYE(I),0,:), PLinVelEC(p%DOFs%PYE(L),0,:) ) + DOT_PRODUCT(PAngVelEH(p%DOFs%PYE(I),0,:), HInerDyP)
+             p%HubMass*DOT_PRODUCT(RtHSdat%PLinVelEC(p%DOFs%PYE(I),0,:), RtHSdat%PLinVelEC(p%DOFs%PYE(L),0,:) ) + DOT_PRODUCT(RtHSdat%PAngVelEH(p%DOFs%PYE(I),0,:), HInerDyP)
          
          !..................
          ! [C(q,t)]A
          !..................
          AInerDyP = p%AtfaIner*CoordSys%tfa*DOT_PRODUCT( CoordSys%tfa, RtHSdat%PAngVelEA(p%DOFs%PYE(L),0,:) )
          AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) = AugMat(p%DOFs%PYE(I), p%DOFs%PYE(L)) + &
-             p%BoomMass*DOT_PRODUCT(PLinVelEI(p%DOFs%PYE(I),0,:), PLinVelEI(p%DOFs%PYE(L),0,:) + DOT_PRODUCT(PAngVelEA(p%DOFs%PYE(I),0,:), AInerDyP) + &
-             p%TFinMass*DOT_PRODUCT(PLinVelEJ(p%DOFs%PYE(I),0,:), PLinVelEJ(p%DOFs%PYE(L),0,:) ) 
+             p%BoomMass*DOT_PRODUCT(RtHSdat%PLinVelEI(p%DOFs%PYE(I),0,:), RtHSdat%PLinVelEI(p%DOFs%PYE(L),0,:) ) + DOT_PRODUCT(RtHSdat%PAngVelEA(p%DOFs%PYE(I),0,:), AInerDyP) + &
+             p%TFinMass*DOT_PRODUCT(RtHSdat%PLinVelEJ(p%DOFs%PYE(I),0,:), RtHSdat%PLinVelEJ(p%DOFs%PYE(L),0,:) ) 
          
       ENDDO  ! I = L,p%DOFs%NPYE
    ENDDO  ! L = 1,p%DOFs%NPYE
@@ -8610,9 +8610,9 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
         + p%PtfmYIner*CoordSys%a2*DOT_PRODUCT( CoordSys%a2, RtHSdat%AngVelEX ) &
         + p%PtfmPIner*CoordSys%a3*DOT_PRODUCT( CoordSys%a3, RtHSdat%AngVelEX )
        
-      XTmpVec = CROSS_PRODUCT( RtHSdat%AngVelEX(PYE(I),0,:), XInerDy ) 
+      XTmpVec = CROSS_PRODUCT( RtHSdat%AngVelEX, XInerDy ) 
       AugMat(p%DOFs%PYE(I), p%NAug) = AugMat(p%DOFs%PYE(I), p%NAug) + &
-        p%PtfmMass*DOT_PRODUCT(PLinVelEY(p%DOFs%PYE(I),0,:), RtHSdat%LinAccEYt) + DOT_PRODUCT(-AngVelEX(p%DOFs%PYE(I),0,:), XTmpVec)
+        p%PtfmMass*DOT_PRODUCT(RtHSdat%PLinVelEY(p%DOFs%PYE(I),0,:), RtHSdat%LinAccEYt) + DOT_PRODUCT(-RtHSdat%AngVelEX, XTmpVec)
             
          !..................
          ! {-f(qd,q,t)}N
@@ -8620,7 +8620,7 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
       NInerDy = p%Nacd2Iner*CoordSys%d2*DOT_PRODUCT( CoordSys%d2, RtHSdat%AngVelEN )
       NTmpVec = p%Nacd2Iner*CoordSys%d2*DOT_PRODUCT( CoordSys%d2, RtHSdat%AngAccENt ) + CROSS_PRODUCT( RtHSdat%AngVelEN, NInerDy )
       AugMat(p%DOFs%PYE(I), p%NAug) = AugMat(p%DOFs%PYE(I), p%NAug) - &
-        p%NacMass*DOT_PRODUCT(PLinVelEU(p%DOFs%PYE(I),0,:), RtHSdat%LinAccEUt) + DOT_PRODUCT(-PAngVelEN(p%DOFs%PYE(I),0,:), NTmpVec)
+        p%NacMass*DOT_PRODUCT(RtHSdat%PLinVelEU(p%DOFs%PYE(I),0,:), RtHSdat%LinAccEUt) + DOT_PRODUCT(-RtHSdat%PAngVelEN(p%DOFs%PYE(I),0,:), NTmpVec)
          
          !..................
          ! {-f(qd,q,t)}R
@@ -8628,7 +8628,7 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
       RInerDy = p%RrfaIner*CoordSys%rfa*DOT_PRODUCT( CoordSys%rfa, RtHSdat%AngVelER )
       RTmpVec = p%RrfaIner*CoordSys%rfa*DOT_PRODUCT( CoordSys%rfa, RtHSdat%AngAccERt ) + CROSS_PRODUCT( RtHSdat%AngVelER, RInerDy )
       AugMat(p%DOFs%PYE(I), p%NAug) = AugMat(p%DOFs%PYE(I), p%NAug) - &
-        p%RFrlMass*DOT_PRODUCT(PLinVelED(p%DOFs%PYE(I),0,:), RtHSdat%LinAccEDt) + DOT_PRODUCT(-PAngVelER(p%DOFs%PYE(I),0,:), RTmpVec)
+        p%RFrlMass*DOT_PRODUCT(RtHSdat%PLinVelED(p%DOFs%PYE(I),0,:), RtHSdat%LinAccEDt) + DOT_PRODUCT(-RtHSdat%PAngVelER(p%DOFs%PYE(I),0,:), RTmpVec)
          
          !..................
          ! {-f(qd,q,t)}H
@@ -8638,7 +8638,7 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
       HTmpVec = p%Hubg1Iner*CoordSys%g1*DOT_PRODUCT( CoordSys%g1, RtHSdat%AngAccEHt ) + &
                 p%Hubg2Iner*CoordSys%g2*DOT_PRODUCT( CoordSys%g2, RtHSdat%AngAccEHt ) + CROSS_PRODUCT(RtHSdat%AngVelEH, HInerDy) 
       AugMat(p%DOFs%PYE(I), p%NAug) = AugMat(p%DOFs%PYE(I), p%NAug) - &
-        p%HubMass*DOT_PRODUCT(PLinVelEC(p%DOFs%PYE(I),0,:), RtHSdat%LinAccECt) + DOT_PRODUCT(-PAngVelEH(p%DOFs%PYE(I),0,:), HTmpVec)
+        p%HubMass*DOT_PRODUCT(RtHSdat%PLinVelEC(p%DOFs%PYE(I),0,:), RtHSdat%LinAccECt) + DOT_PRODUCT(-RtHSdat%PAngVelEH(p%DOFs%PYE(I),0,:), HTmpVec)
        
          !..................
          ! {-f(qd,q,t)}A
@@ -8646,8 +8646,8 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
       AInerDy = p%AtfaIner*CoordSys%tfa*DOT_PRODUCT( CoordSys%tfa, RtHSdat%AngVelEA )
       ATmpVec = p%AtfaIner*CoordSys%tfa*DOT_PRODUCT( CoordSys%tfa, RtHSdat%AngAccEAt ) + CROSS_PRODUCT( RtHSdat%AngVelEA, AInerDy )
       AugMat(p%DOFs%PYE(I), p%NAug) = AugMat(p%DOFs%PYE(I), p%NAug) - &
-        p%BoomMass*DOT_PRODUCT(PLinVelEI(p%DOFs%PYE(I),0,:), RtHS%LinAccEIt) + DOT_PRODUCT(-PAngVelEA(p%DOFs%PYE(I),0,:), ATmpVec) - &
-        p%TFinMass*DOT_PRODUCT(PLinVelEJ(p%DOFs%PYE(I),:,0), LinAccEJt )
+        p%BoomMass*DOT_PRODUCT(RtHSdat%PLinVelEI(p%DOFs%PYE(I),0,:), RtHSdat%LinAccEIt) + DOT_PRODUCT(-RtHSdat%PAngVelEA(p%DOFs%PYE(I),0,:), ATmpVec) - &
+        p%TFinMass*DOT_PRODUCT(RtHSdat%PLinVelEJ(p%DOFs%PYE(I),:,0), RtHSdat%LinAccEJt )
        
          !..................
          ! {-f(qd,q,t)}AeroA    <-- COMMENT OUT THIS SECTION IF VALIDATING AGAINST FAST DATA!!!
@@ -8661,30 +8661,30 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
    !   [C(q,t)]G
    !  {-f(qd,q,t)}G
    
-   DO L = 1,p%DOFs%NPX
-      DO I = L,p%DOFs%NPX
+   DO L = 1,NPX
+      DO I = L,NPX
           
       !..................
       ! [C(q,t)]G
       !..................
-         GInerDyP = p%GenIner*CoordSys%c1*DOT_PRODUCT( CoordSys%c1 , RtHSdat%PAngVelEG(PX(L)) )
-         AugMat(p%DOFs%PX(I), p%DOFs%PX(L)) = AugMat(p%DOFs%PX(I), p%DOFs%PX(L)) + &
-             DOT_PRODUCT(PAngVelEG(p%DOFs%PX(I), GInerDyP)
+         GInerDyP = p%GenIner*CoordSys%c1*DOT_PRODUCT( CoordSys%c1 , RtHSdat%PAngVelEG(PX(L),0,:) )
+         AugMat(PX(I), PX(L)) = AugMat(PX(I), PX(L)) + &
+             DOT_PRODUCT( RtHSdat%PAngVelEG(PX(I),0,:), GInerDyP )
        
-      ENDDO  ! I = L,p%DOFs%NPX
-   ENDDO  ! L = 1,p%DOFs%NPX
+      ENDDO  ! I = L,NPX
+   ENDDO  ! L = 1,NPX
    
-   DO I = 1,p%DOFs%NPX
+   DO I = 1,NPX
        
       !..................
       ! {-f(qd,q,t)}G
       !..................
       GInerDy = p%GenIner*CoordSys%c1* DOT_PRODUCT( CoordSys%c1 , RtHSdat%AngVelEG )
       GTmpVec = p%GenIner*CoordSys%c1*DOT_PRODUCT( CoordSys%c1, RtHSdat%AngAccERt ) + CROSS_PRODUCT( RtHSdat%AngVelEG, GInerDy )
-      AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) + &
+      AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) + &
         DOT_PRODUCT(-RtHSdat%PAngVelEG(PX(I),0,:), GTmpVec)
       
-   ENDDO  ! I = 1,p%DOFs%NPX
+   ENDDO  ! I = 1,NPX
    
    ! Apply gravity terms applicable to platform heave/roll/pitch/yaw DOFs (typically commented out for force control, but included here just in case)
    !   {-f(qd,q,t)GravX + {-f(qd,q,t)GravT + {-f(qd,q,t)GravN + {-f(qd,q,t)GravR + {-f(qd,q,t)GravH + {-f(qd,q,t)GravB1 {-f(qd,q,t)GravB2 (+ {-f(qd,q,t)GravB3) + {-f(qd,q,t)GravA
@@ -8697,18 +8697,18 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
    !
    !DO K = 1,p%NumBl
    !    
-   !   DO I = 1,p%DOFs%NPX    
-   !      AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%TipMass(K)*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelES(K,p%TipNode,p%DOFs%PX(I),0,:), CoordSys%z2 )
-   !   ENDDO  ! I = 1,p%DOFs%NPX
+   !   DO I = 1,NPX    
+   !      AugMat(PX(I), p%NAug) = AugMatPX(I), p%NAug) - p%TipMass(K)*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelES(K,p%TipNode,PX(I),0,:), CoordSys%z2 )
+   !   ENDDO  ! I = 1,NPX
    !   IF ( p%DOF_Flag(DOF_Hv) )  THEN
    !       AugMat(DOF_Hv, p%NAug) = AugMat(DOF_Hv, p%NAug) - p%TipMass(K)*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelES(K,p%TipNode,DOF_Hv,0,:), CoordSys%z2 )
    !   ENDIF  ! p%DOF_Flag(DOF_Hv)
    !   
    !   DO J = 1,p%BldNodes ! Loop through the blade nodes / elements
    !       
-   !      DO I = 1,p%DOFs%NPX
-   !         AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%BElmntMass(J,K)*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelES(K,J,p%DOFs%PX(I),0,:), CoordSys%z2 )
-   !      ENDDO  ! I = 1,p%DOFs%NPX
+   !      DO I = 1,NPX
+   !         AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) - p%BElmntMass(J,K)*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelES(K,J,PX(I),0,:), CoordSys%z2 )
+   !      ENDDO  ! I = 1,NPX
    !      IF ( p%DOF_Flag(DOF_Hv) )  THEN
    !       AugMat(DOF_Hv, p%NAug) = AugMat(DOF_Hv, p%NAug) - p%BElmntMass(J,K)*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelES(K,J,DOF_Hv,0,:), CoordSys%z2 )
    !      ENDIF  ! p%DOF_Flag(DOF_Hv)
@@ -8721,18 +8721,18 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
    !    {-f(qd,q,t)}GravT
    !   ..................
    !
-   !DO I = 1,p%DOFs%NPX
-   !   AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%YawBrMass*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelEO(p%DOFs%PX(I),0,:), CoordSys%z2 )
-   !END DO  ! I = 1,p%DOFs%PXE
+   !DO I = 1,NPX
+   !   AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) - p%YawBrMass*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelEO(PX(I),0,:), CoordSys%z2 )
+   !END DO  ! I = 1,PXE
    !IF ( p%DOF_Flag(DOF_Hv) )  THEN
    !       AugMat(DOF_Hv, p%NAug) = AugMat(DOF_Hv, p%NAug) - p%YawBrMass*p%Gravity*DOT_PRODUCT( RtHSdat%PLinVelEO(DOF_Hv,0,:), CoordSys%z2 )
    !ENDIF  ! p%DOF_Flag(DOF_Hv)
    !
    !DO J = 1,p%TwrNodes
    !    
-   !    DO I = 1,p%DOFs%NPX
-   !         AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%TElmntMass(J)*p%Gravity*DOT_PRODUCT(RtHSdat%PLinVelET(J,p%DOFs%PX(I),0,:), CoordSys%z2 )
-   !    ENDDO  ! I = 1,p%DOFs%NPX
+   !    DO I = 1,NPX
+   !         AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) - p%TElmntMass(J)*p%Gravity*DOT_PRODUCT(RtHSdat%PLinVelET(J,PX(I),0,:), CoordSys%z2 )
+   !    ENDDO  ! I = 1,NPX
    !    IF ( p%DOF_Flag(DOF_Hv) )  THEN
    !       AugMat(DOF_Hv, p%NAug) = AugMat(DOF_Hv, p%NAug) - p%TElmntMass(J)*p%Gravity*DOT_PRODUCT(RtHSdat%PLinVelET(J,DOF_Hv,0,:), CoordSys%z2 )
    !    ENDIF  ! p%DOF_Flag(DOF_Hv)
@@ -8741,35 +8741,35 @@ IF (p%HybridMode == HybridMode_FORCECTRL)  THEN
    !         
    ! Apply all the portions from other components
    !
-   !DO I = 1,p%DOFs%NPX
+   !DO I = 1,NPX
    !    
    !   ..................
    !    {-f(qd,q,t)}GravX (roll/pitch/yaw)
    !   ..................
-   !   AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%PtfmMass*p%Gravity*DOT_PRODUCT(PLinVelEY(p%DOFs%PX(I),0,:), CoordSys%z2)
+   !   AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) - p%PtfmMass*p%Gravity*DOT_PRODUCT(PLinVelEY(PX(I),0,:), CoordSys%z2)
    !    
    !   ..................
    !    {-f(qd,q,t)}GravN (roll/pitch/yaw)
    !   ..................
-   !   AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%NacMass*p%Gravity*DOT_PRODUCT(PLinVelEU(p%DOFs%PX(I),0,:), CoordSys%z2)
+   !   AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) - p%NacMass*p%Gravity*DOT_PRODUCT(PLinVelEU(PX(I),0,:), CoordSys%z2)
    !    
    !   ..................
    !    {-f(qd,q,t)}GravR (roll/pitch/yaw)
    !   ..................
-   !   AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%RFrlMass*p%Gravity*DOT_PRODUCT(PLinVelED(p%DOFs%PX(I),0,:), CoordSys%z2)
+   !   AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) - p%RFrlMass*p%Gravity*DOT_PRODUCT(PLinVelED(PX(I),0,:), CoordSys%z2)
    !    
    !   ..................
    !    {-f(qd,q,t)}GravH (roll/pitch/yaw)
    !   ..................
-   !   AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%HubMass*p%Gravity*DOT_PRODUCT(PLinVelEC(p%DOFs%PX(I),0,:), CoordSys%z2)
+   !   AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) - p%HubMass*p%Gravity*DOT_PRODUCT(PLinVelEC(PX(I),0,:), CoordSys%z2)
    !    
    !   ..................
    !    {-f(qd,q,t)}GravA (roll/pitch/yaw)
    !   .................. 
-   !   AugMat(p%DOFs%PX(I), p%NAug) = AugMat(p%DOFs%PX(I), p%NAug) - p%BoomMass*p%Gravity*DOT_PRODUCT(PLinVelEI(p%DOFs%PX(I),0,:), CoordSys%z2) &
-   !                                                               - p%TFinMass*p%Gravity*DOT_PRODUCT(PLinVelEJ(p%DOFs%PX(I),0,:), CoordSys%z2)
+   !   AugMat(PX(I), p%NAug) = AugMat(PX(I), p%NAug) - p%BoomMass*p%Gravity*DOT_PRODUCT(PLinVelEI(PX(I),0,:), CoordSys%z2) &
+   !                                                               - p%TFinMass*p%Gravity*DOT_PRODUCT(PLinVelEJ(PX(I),0,:), CoordSys%z2)
    !    
-   !ENDDO  ! I = 1,p%DOFs%NPX
+   !ENDDO  ! I = 1,NPX
    !
    !IF p%DOF_Flag(DOF_Hv)  THEN
    !
@@ -8812,7 +8812,7 @@ ENDIF  ! p%HybridMode == HybridMode_FORCECTRL
 ! NOTE: The vector subscript array, SrtPS(), used in the following loops must be sorted from smallest to largest DOF index in order
 !   for the loops to work to enter values only on and below the diagonal of AugMat():
 !..................................................................................................................................
-IF p%HybridMode /= HybridMode_FORCECTRL  THEN  ! Force control fills the platform DOFs in the matrix using kinematics (above) instead of partial loads
+IF ( p%HybridMode /= HybridMode_FORCECTRL )  THEN  ! Force control fills the platform DOFs in the matrix using kinematics (above) instead of partial loads
 
    IF ( p%DOF_Flag (DOF_Sg  ) )  THEN
       DO I = p%DOFs%Diag(DOF_Sg  ),p%DOFs%NActvDOF   ! Loop through all active (enabled) DOFs on or below the diagonal

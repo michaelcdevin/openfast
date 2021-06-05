@@ -525,51 +525,6 @@ SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, Hyb
    ! Set the inputs from ElastoDyn and/or BeamDyn:
    !-------------------------------------------------------------------------------------------------
    
-      ! @mcd: To create a pseudo-"AD-only" numerical model for force control, overwrite the base ElastoDyn outputs with the outputs generated via external inputs
-   
-   IF (HybridMode == 2) THEN  ! hybrid simulation, force control
-            ! tower
-      IF (u_AD%TowerMotion%Committed) THEN
-      
-         CALL Transfer_Line2_to_Line2( y_ED%TowerLn2Mesh_hybrid, u_AD%TowerMotion, MeshMapData%ED_L_2_AD_L_T, ErrStat2, ErrMsg2 )
-            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%TowerMotion' )      
-            
-      END IF
-   
-      
-      ! hub
-      CALL Transfer_Point_to_Point( y_ED%HubPtMotion_hybrid, u_AD%HubMotion, MeshMapData%ED_P_2_AD_P_H, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%HubMotion' )      
-   
-   
-      ! blade root   
-      DO k=1,size(y_ED%BladeRootMotion_hybrid)
-         CALL Transfer_Point_to_Point( y_ED%BladeRootMotion_hybrid(k), u_AD%BladeRootMotion(k), MeshMapData%ED_P_2_AD_P_R(k), ErrStat2, ErrMsg2 )
-            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeRootMotion('//trim(num2lstr(k))//')' )      
-      END DO
-      
-   
-      ! blades
-      IF (p_FAST%CompElast == Module_ED ) THEN
-      
-         DO k=1,size(y_ED%BladeLn2Mesh_hybrid)
-            CALL Transfer_Line2_to_Line2( y_ED%BladeLn2Mesh_hybrid(k), u_AD%BladeMotion(k), MeshMapData%BDED_L_2_AD_L_B(k), ErrStat2, ErrMsg2 )
-               CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeMotion('//trim(num2lstr(k))//')' )   
-         END DO
-      
-      !ELSEIF (p_FAST%CompElast == Module_BD ) THEN  ! @mcd: may implement this later if we want to include BeamDyn
-      
-         ! get them from BeamDyn
-         !DO k=1,size(u_AD%BladeMotion)
-         !   CALL Transfer_Line2_to_Line2( BD%y(k)%BldMotion, u_AD%BladeMotion(k), MeshMapData%BDED_L_2_AD_L_B(k), ErrStat2, ErrMsg2 )
-         !      CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//':u_AD%BladeMotion('//trim(num2lstr(k))//')' )   
-         !END DO
-      
-            
-      END IF  ! (p_FAST%CompElast == Module_ED )
-
-   
-   ELSE  ! normal simulation (no hybrid model)
       ! tower
       IF (u_AD%TowerMotion%Committed) THEN
       
@@ -609,8 +564,6 @@ SUBROUTINE AD_InputSolve_NoIfW( p_FAST, u_AD, y_SrvD, y_ED, BD, MeshMapData, Hyb
       
             
       END IF  ! (p_FAST%CompElast == Module_ED )
-      
-   END IF  ! I-normal simulation
 
 
       ! Set Conrol parameter (i.e. flaps) if using ServoDyn
