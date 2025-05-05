@@ -1177,9 +1177,9 @@ SUBROUTINE MD_SetExternalInputs( p_FAST, m_FAST, m_MD )
    DO I=1,SIZE(m_MD%PointList)
       J = m_MD%PointList(I)%ExternIdx
       IF ( J > 0 ) THEN
-         m_MD%PointList(I)%pointFX = m_FAST%ExternInput%PointFrcs(J)
-         m_MD%PointList(I)%pointFY = m_FAST%ExternInput%PointFrcs(J+1)
-         m_MD%PointList(I)%pointFZ = m_FAST%ExternInput%PointFrcs(J+2)
+         m_MD%PointList(I)%pointFX = m_FAST%ExternInput%PointFrcs(3*J-2)
+         m_MD%PointList(I)%pointFY = m_FAST%ExternInput%PointFrcs(3*J-1)
+         m_MD%PointList(I)%pointFZ = m_FAST%ExternInput%PointFrcs(3*J)
       ELSE
          m_MD%PointList(I)%pointFX = 0.0_DbKi
          m_MD%PointList(I)%pointFY = 0.0_DbKi

@@ -1090,7 +1090,7 @@ CONTAINS
                   Line = NextLine(i)
 
                   ! check for correct number of columns in current line
-                  IF ( CountWords( Line ) /= 9 ) THEN
+                  IF ( CountWords( Line ) /= 10 ) THEN
                       CALL SetErrStat( ErrID_Fatal, ' Unable to parse Point '//trim(Num2LStr(l))//' on row '//trim(Num2LStr(i))//' in input file. Row has wrong number of columns. Must be 9 columns.', ErrStat, ErrMsg, RoutineName )
                       CALL CleanUp()
                       RETURN
