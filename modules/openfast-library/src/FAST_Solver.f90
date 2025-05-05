@@ -1188,7 +1188,7 @@ SUBROUTINE MD_SetExternalInputs( p_FAST, m_FAST, m_MD )
    ENDDO
 
       
-END SUBROUTINE MD_SetExternalInput
+END SUBROUTINE MD_SetExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine transfers the SD outputs into inputs required for HD
 SUBROUTINE Transfer_SD_to_HD( y_SD, u_HD_W_Mesh, u_HD_M_Mesh, MeshMapData, ErrStat, ErrMsg )

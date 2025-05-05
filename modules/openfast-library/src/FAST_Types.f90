@@ -680,6 +680,7 @@ IMPLICIT NONE
 ! =======================
 ! =========  FAST_ExternInputType  =======
   TYPE, PUBLIC :: FAST_ExternInputType
+    REAL(ReKi) , DIMENSION(1:9)  :: PointFrcs      !< mooring force inputs from Simulink/Labview [-]
     REAL(ReKi)  :: GenTrq      !< generator torque input from Simulink/Labview [-]
     REAL(ReKi)  :: ElecPwr      !< electric power input from Simulink/Labview [-]
     REAL(ReKi)  :: YawPosCom      !< yaw position command from Simulink/Labview [-]
@@ -44347,6 +44348,7 @@ ENDIF
 ! 
    ErrStat = ErrID_None
    ErrMsg  = ""
+    DstExternInputTypeData%PointFrcs = SrcExternInputTypeData%PointFrcs
     DstExternInputTypeData%GenTrq = SrcExternInputTypeData%GenTrq
     DstExternInputTypeData%ElecPwr = SrcExternInputTypeData%ElecPwr
     DstExternInputTypeData%YawPosCom = SrcExternInputTypeData%YawPosCom
@@ -44417,6 +44419,7 @@ ENDIF
   Re_BufSz  = 0
   Db_BufSz  = 0
   Int_BufSz  = 0
+      Re_BufSz   = Re_BufSz   + SIZE(InData%PointFrcs)  ! PointFrcs
       Re_BufSz   = Re_BufSz   + 1  ! GenTrq
       Re_BufSz   = Re_BufSz   + 1  ! ElecPwr
       Re_BufSz   = Re_BufSz   + 1  ! YawPosCom
@@ -44454,6 +44457,10 @@ ENDIF
   Db_Xferred  = 1
   Int_Xferred = 1
 
+    DO i1 = LBOUND(InData%PointFrcs,1), UBOUND(InData%PointFrcs,1)
+      ReKiBuf(Re_Xferred) = InData%PointFrcs(i1)
+      Re_Xferred = Re_Xferred + 1
+    END DO
     ReKiBuf(Re_Xferred) = InData%GenTrq
     Re_Xferred = Re_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%ElecPwr
@@ -44513,6 +44520,12 @@ ENDIF
   Re_Xferred  = 1
   Db_Xferred  = 1
   Int_Xferred  = 1
+    i1_l = LBOUND(OutData%PointFrcs,1)
+    i1_u = UBOUND(OutData%PointFrcs,1)
+    DO i1 = LBOUND(OutData%PointFrcs,1), UBOUND(OutData%PointFrcs,1)
+      OutData%PointFrcs(i1) = ReKiBuf(Re_Xferred)
+      Re_Xferred = Re_Xferred + 1
+    END DO
     OutData%GenTrq = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
     OutData%ElecPwr = ReKiBuf(Re_Xferred)

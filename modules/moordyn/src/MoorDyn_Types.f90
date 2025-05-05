@@ -144,6 +144,7 @@ IMPLICIT NONE
     INTEGER(IntKi) , DIMENSION(1:10)  :: Attached      !< list of IdNums of lines attached to this point node [-]
     INTEGER(IntKi) , DIMENSION(1:10)  :: Top      !< list of ints specifying whether each line is attached at 1 = top/fairlead(end B), 0 = bottom/anchor(end A) [-]
     INTEGER(IntKi)  :: nAttached = 0      !< number of attached lines [-]
+    INTEGER(IntKi)  :: ExternIdx      !< index of external force input (zero means no external force applied) [-]
     REAL(DbKi)  :: pointM      !< point mass [[kg]]
     REAL(DbKi)  :: pointV      !< point volume [[m^3]]
     REAL(DbKi)  :: pointFX      !<  [-]
@@ -2431,6 +2432,7 @@ ENDIF
     DstPointData%Attached = SrcPointData%Attached
     DstPointData%Top = SrcPointData%Top
     DstPointData%nAttached = SrcPointData%nAttached
+    DstPointData%ExternIdx = SrcPointData%ExternIdx
     DstPointData%pointM = SrcPointData%pointM
     DstPointData%pointV = SrcPointData%pointV
     DstPointData%pointFX = SrcPointData%pointFX
@@ -2528,6 +2530,7 @@ ENDIF
       Int_BufSz  = Int_BufSz  + SIZE(InData%Attached)  ! Attached
       Int_BufSz  = Int_BufSz  + SIZE(InData%Top)  ! Top
       Int_BufSz  = Int_BufSz  + 1  ! nAttached
+      Int_BufSz  = Int_BufSz  + 1  ! ExternIdx
       Db_BufSz   = Db_BufSz   + 1  ! pointM
       Db_BufSz   = Db_BufSz   + 1  ! pointV
       Db_BufSz   = Db_BufSz   + 1  ! pointFX
@@ -2593,6 +2596,8 @@ ENDIF
       Int_Xferred = Int_Xferred + 1
     END DO
     IntKiBuf(Int_Xferred) = InData%nAttached
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%ExternIdx
     Int_Xferred = Int_Xferred + 1
     DbKiBuf(Db_Xferred) = InData%pointM
     Db_Xferred = Db_Xferred + 1
@@ -2708,6 +2713,8 @@ ENDIF
       Int_Xferred = Int_Xferred + 1
     END DO
     OutData%nAttached = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%ExternIdx = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
     OutData%pointM = DbKiBuf(Db_Xferred)
     Db_Xferred = Db_Xferred + 1

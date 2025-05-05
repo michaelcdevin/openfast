@@ -1503,8 +1503,7 @@ CONTAINS
       if (allocated(Init%OutData_SD%CableCChanRqst)) then
          Init%InData_SrvD%NumCableControl = max(Init%InData_SrvD%NumCableControl, size(Init%OutData_SD%CableCChanRqst))
       endif
-      if (allocated(Init%OutData_
-      %CableCChanRqst)) then
+      if (allocated(Init%OutData_MD%CableCChanRqst)) then
          Init%InData_SrvD%NumCableControl = max(Init%InData_SrvD%NumCableControl, size(Init%OutData_MD%CableCChanRqst))
       endif
       ! Set an array listing which modules requested which channels.
