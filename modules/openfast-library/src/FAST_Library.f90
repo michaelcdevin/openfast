@@ -23,7 +23,7 @@ MODULE FAST_Data
    INTEGER,        PARAMETER             :: IntfStrLen  = 1025       ! length of strings through the C interface
    INTEGER(IntKi), PARAMETER             :: MAXOUTPUTS = 4000        ! Maximum number of outputs
    INTEGER(IntKi), PARAMETER             :: MAXInitINPUTS = 53       ! Maximum number of initialization values from Simulink
-   INTEGER(IntKi), PARAMETER             :: NumFixedInputs = 51
+   INTEGER(IntKi), PARAMETER             :: NumFixedInputs = 9
    
    
       ! Global (static) data:
@@ -295,7 +295,8 @@ subroutine FAST_Update(iTurb_c, NumInputs_c, NumOutputs_c, InputAry, OutputAry, 
       ErrMsg    = "FAST_Update:size of OutputAry is invalid or FAST has too many outputs."//C_NULL_CHAR
       ErrMsg_c  = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
       RETURN
-   ELSEIF(  NumInputs_c /= NumFixedInputs .AND. NumInputs_c /= NumFixedInputs+3 ) THEN
+   ELSEIF(  NumInputs_c /= NumFixedInputs .AND. NumInputs_c /= NumFixedInputs+42
+      .AND. NumInputs_c /= NumFixedInputs+45 ) THEN
       ErrStat_c = ErrID_Fatal
       ErrMsg    = "FAST_Update:size of InputAry is invalid."//C_NULL_CHAR
       ErrMsg_c  = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
@@ -391,12 +392,12 @@ subroutine FAST_SetExternalInputs(iTurb, NumInputs_c, InputAry, m_FAST)
 
       ! Coupling with MoorDyn
       ! MCD: this is a hack assuming that there are only 3 mooring lines TODO
-      IF ( NumInputs_c == 9 ) THEN 
+      IF ( NumInputs_c == NumFixedInputs ) THEN 
          m_FAST%ExternInput%PointFrcs = InputAry(:)
      
       ! This is the original functionality of the S-Function
       ! Couples with ServoDyn
-      ELSEIF ( NumInputs_c == NumFixedInputs ) THEN
+      ELSEIF ( NumInputs_c == NumFixedInputs + 42 ) THEN
          !NOTE: if anything here changes, update ServoDyn_IO.f90::WrSumInfo4Simulink
          m_FAST%ExternInput%GenTrq           = InputAry(1)
          m_FAST%ExternInput%ElecPwr          = InputAry(2)
@@ -407,7 +408,7 @@ subroutine FAST_SetExternalInputs(iTurb, NumInputs_c, InputAry, m_FAST)
          m_FAST%ExternInput%BlAirfoilCom     = InputAry(9:11)
          m_FAST%ExternInput%CableDeltaL      = InputAry(12:31)
          m_FAST%ExternInput%CableDeltaLdot   = InputAry(32:51)
-      ELSEIF ( NumInputs_c == NumFixedInputs + 3 ) THEN
+      ELSEIF ( NumInputs_c == NumFixedInputs + 45 ) THEN
             m_FAST%ExternInput%LidarFocus = InputAry(52:54)
       ENDIF   
       

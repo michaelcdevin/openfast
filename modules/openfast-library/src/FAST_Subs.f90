@@ -1472,6 +1472,13 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       endif
    end if
 
+   ! mcd: update so this isn't hardcoded for 3 mooring lines TODO
+   if ( p_FAST%CompMooring == MODULE_MD ) then
+      do i=1,9
+         m_FAST%ExternInput%PointFrcs(i) = 0.0_ReKi
+      end do
+   end if
+
 
 
 
@@ -1496,7 +1503,8 @@ CONTAINS
       if (allocated(Init%OutData_SD%CableCChanRqst)) then
          Init%InData_SrvD%NumCableControl = max(Init%InData_SrvD%NumCableControl, size(Init%OutData_SD%CableCChanRqst))
       endif
-      if (allocated(Init%OutData_MD%CableCChanRqst)) then
+      if (allocated(Init%OutData_
+      %CableCChanRqst)) then
          Init%InData_SrvD%NumCableControl = max(Init%InData_SrvD%NumCableControl, size(Init%OutData_MD%CableCChanRqst))
       endif
       ! Set an array listing which modules requested which channels.
