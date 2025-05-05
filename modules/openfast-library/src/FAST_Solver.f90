@@ -1187,7 +1187,6 @@ SUBROUTINE MD_SetExternalInputs( p_FAST, m_FAST, m_MD )
       ENDIF
    ENDDO
 
-      
 END SUBROUTINE MD_SetExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine transfers the SD outputs into inputs required for HD

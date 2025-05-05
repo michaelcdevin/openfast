@@ -295,7 +295,8 @@ subroutine FAST_Update(iTurb_c, NumInputs_c, NumOutputs_c, InputAry, OutputAry, 
       ErrMsg    = "FAST_Update:size of OutputAry is invalid or FAST has too many outputs."//C_NULL_CHAR
       ErrMsg_c  = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
       RETURN
-   ELSEIF(  NumInputs_c /= NumFixedInputs .AND. NumInputs_c /= NumFixedInputs+42
+   ELSEIF(  NumInputs_c /= NumFixedInputs      &
+      .AND. NumInputs_c /= NumFixedInputs+42   &
       .AND. NumInputs_c /= NumFixedInputs+45 ) THEN
       ErrStat_c = ErrID_Fatal
       ErrMsg    = "FAST_Update:size of InputAry is invalid."//C_NULL_CHAR
