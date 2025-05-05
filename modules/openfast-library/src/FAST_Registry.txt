@@ -667,7 +667,8 @@ typedef	^	FAST_ModuleMapType	MeshType	u_Orca_PtfmMesh	-	-	-	"copy of Orca PtfmMe
 typedef	^	FAST_ModuleMapType	MeshType	u_ExtPtfm_PtfmMesh	-	-	-	"copy of ExtPtfm_MCKF PtfmMesh input mesh"
 #typedef	^	FAST_ModuleMapType	MeshType	u_FarmMD_CoupledLoads -	-	-	"FAST-internal copy of MoorDyn's CoupledLoads output mesh for use with shared moorings in FAST.Farm"
 # ..... FAST_ExternalInput data .......................................................................................................
-typedef	FAST	FAST_ExternInputType	ReKi	GenTrq	-	-	-	"generator torque input from Simulink/Labview"
+typedef FAST    FAST_ExternInputType    ReKi    PointFrcs   {9}   -   -    "mooring force inputs from Simulink/Labview"
+typedef	^	FAST_ExternInputType	ReKi	GenTrq	-	-	-	"generator torque input from Simulink/Labview"
 typedef	^	FAST_ExternInputType	ReKi	ElecPwr	-	-	-	"electric power input from Simulink/Labview"
 typedef	^	FAST_ExternInputType	ReKi	YawPosCom	-	-	2pi	"yaw position command from Simulink/Labview"
 typedef	^	FAST_ExternInputType	ReKi	YawRateCom	-	-	-	"yaw rate command from Simulink/Labview"

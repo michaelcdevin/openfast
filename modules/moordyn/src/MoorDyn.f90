@@ -1096,11 +1096,12 @@ CONTAINS
                       RETURN
                   END IF
                   
-                  ! parse out entries: PointID Attachment  X  Y  Z  M  V  CdA Ca 
+                  ! parse out entries: PointID Attachment  X  Y  Z  M  V  CdA Ca ExternIdx
                   IF (ErrStat2 == 0) THEN
                      READ(Line,*,IOSTAT=ErrStat2) m%PointList(l)%IdNum, tempString1, tempArray(1), &
                         tempArray(2), tempString4, m%PointList(l)%pointM, &
-                        m%PointList(l)%pointV, m%PointList(l)%pointCdA, m%PointList(l)%pointCa
+                        m%PointList(l)%pointV, m%PointList(l)%pointCdA, m%PointList(l)%pointCa, &
+                        m%PointList(l)%ExternIdx
                                           
                      CALL Conv2UC(tempString4) ! convert to uppercase so that matching is not case-sensitive
                      
@@ -1113,7 +1114,7 @@ CONTAINS
                         !TODO: add error check for if the above read fails
                      end if
                         
-                     ! not used
+                     ! initialize to zero (this may be read in externally from Simulink later)
                      m%PointList(l)%pointFX = 0.0_DbKi 
                      m%PointList(l)%pointFY = 0.0_DbKi
                      m%PointList(l)%pointFZ = 0.0_DbKi

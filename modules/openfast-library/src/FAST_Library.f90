@@ -388,23 +388,28 @@ subroutine FAST_SetExternalInputs(iTurb, NumInputs_c, InputAry, m_FAST)
 
          ! set the inputs from external code here...
          ! transfer inputs from Simulink to FAST
-      IF ( NumInputs_c < NumFixedInputs ) RETURN ! This is an error
 
-   !NOTE: if anything here changes, update ServoDyn_IO.f90::WrSumInfo4Simulink
-      m_FAST%ExternInput%GenTrq           = InputAry(1)
-      m_FAST%ExternInput%ElecPwr          = InputAry(2)
-      m_FAST%ExternInput%YawPosCom        = InputAry(3)
-      m_FAST%ExternInput%YawRateCom       = InputAry(4)
-      m_FAST%ExternInput%BlPitchCom       = InputAry(5:7)
-      m_FAST%ExternInput%HSSBrFrac        = InputAry(8)
-      m_FAST%ExternInput%BlAirfoilCom     = InputAry(9:11)
-      m_FAST%ExternInput%CableDeltaL      = InputAry(12:31)
-      m_FAST%ExternInput%CableDeltaLdot   = InputAry(32:51)
-            
-      IF ( NumInputs_c > NumFixedInputs ) THEN  ! NumFixedInputs is the fixed number of inputs
-         IF ( NumInputs_c == NumFixedInputs + 3 ) &
-             m_FAST%ExternInput%LidarFocus = InputAry(52:54)
-      END IF   
+      ! Coupling with MoorDyn
+      ! MCD: this is a hack assuming that there are only 3 mooring lines TODO
+      IF ( NumInputs_c == 9 ) THEN 
+         m_FAST%ExternInput%PointFrcs = InputAry(:)
+     
+      ! This is the original functionality of the S-Function
+      ! Couples with ServoDyn
+      ELSEIF ( NumInputs_c == NumFixedInputs ) THEN
+         !NOTE: if anything here changes, update ServoDyn_IO.f90::WrSumInfo4Simulink
+         m_FAST%ExternInput%GenTrq           = InputAry(1)
+         m_FAST%ExternInput%ElecPwr          = InputAry(2)
+         m_FAST%ExternInput%YawPosCom        = InputAry(3)
+         m_FAST%ExternInput%YawRateCom       = InputAry(4)
+         m_FAST%ExternInput%BlPitchCom       = InputAry(5:7)
+         m_FAST%ExternInput%HSSBrFrac        = InputAry(8)
+         m_FAST%ExternInput%BlAirfoilCom     = InputAry(9:11)
+         m_FAST%ExternInput%CableDeltaL      = InputAry(12:31)
+         m_FAST%ExternInput%CableDeltaLdot   = InputAry(32:51)
+      ELSEIF ( NumInputs_c == NumFixedInputs + 3 ) THEN
+            m_FAST%ExternInput%LidarFocus = InputAry(52:54)
+      ENDIF   
       
 end subroutine FAST_SetExternalInputs
 !==================================================================================================================================

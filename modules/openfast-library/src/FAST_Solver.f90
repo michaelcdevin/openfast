@@ -1163,6 +1163,33 @@ SUBROUTINE SrvD_SetExternalInputs( p_FAST, m_FAST, u_SrvD )
 
 END SUBROUTINE SrvD_SetExternalInputs
 !----------------------------------------------------------------------------------------------------------------------------------
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine sets the inputs required for ElastoDyn from an external source (Simulink)
+SUBROUTINE MD_SetExternalInputs( p_FAST, m_FAST, m_MD )
+   
+   TYPE(FAST_ParameterType),         INTENT(IN)     :: p_FAST       !< Glue-code simulation parameters
+   TYPE(FAST_MiscVarType),           INTENT(IN)     :: m_FAST       !< Glue-code misc variables (including inputs from external sources like Simulink)
+   TYPE(MD_MiscVarType),             INTENT(INOUT)  :: m_MD         !< MoorDyn miscellaneous states
+   
+   ! local variables
+   INTEGER(IntKi)                             :: I, J
+   
+   DO I=1,SIZE(m_MD%PointList)
+      J = m_MD%PointList(I)%ExternIdx
+      IF ( J > 0 ) THEN
+         m_MD%PointList(I)%pointFX = m_FAST%ExternInput%PointFrcs(J)
+         m_MD%PointList(I)%pointFY = m_FAST%ExternInput%PointFrcs(J+1)
+         m_MD%PointList(I)%pointFZ = m_FAST%ExternInput%PointFrcs(J+2)
+      ELSE
+         m_MD%PointList(I)%pointFX = 0.0_DbKi
+         m_MD%PointList(I)%pointFY = 0.0_DbKi
+         m_MD%PointList(I)%pointFZ = 0.0_DbKi
+      ENDIF
+   ENDDO
+
+      
+END SUBROUTINE MD_SetExternalInput
+!----------------------------------------------------------------------------------------------------------------------------------
 !> This routine transfers the SD outputs into inputs required for HD
 SUBROUTINE Transfer_SD_to_HD( y_SD, u_HD_W_Mesh, u_HD_M_Mesh, MeshMapData, ErrStat, ErrMsg )
 !..................................................................................................................................
@@ -5132,7 +5159,7 @@ SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, ca
    END IF
    
       !> Solve option 1 (rigorous solve on loads/accelerations)
-   CALL SolveOption1(this_time, this_state, calcJacobian, p_FAST, ED, BD, HD, SD, ExtPtfm, MAPp, FEAM, MD, Orca, IceF, IceD, SrvD, AD, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
+   CALL SolveOption1(this_time, this_state, calcJacobian, p_FAST, m_FAST, ED, BD, HD, SD, ExtPtfm, MAPp, FEAM, MD, Orca, IceF, IceD, SrvD, AD, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )  
 
       
@@ -5195,13 +5222,14 @@ END SUBROUTINE CalcOutputs_And_SolveForInputs
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine implements the "option 1" solve for all inputs with direct links to HD, SD, ExtPtfm, MAP, OrcaFlex interface, and the ED 
 !! platform reference point. Also in solve option 1 are the BD-ED blade root coupling.
-SUBROUTINE SolveOption1(this_time, this_state, calcJacobian, p_FAST, ED, BD, HD, SD, ExtPtfm, MAPp, FEAM, MD, Orca, IceF, IceD, SrvD, AD, MeshMapData, ErrStat, ErrMsg, WriteThisStep )
+SUBROUTINE SolveOption1(this_time, this_state, calcJacobian, p_FAST, m_FAST, ED, BD, HD, SD, ExtPtfm, MAPp, FEAM, MD, Orca, IceF, IceD, SrvD, AD, MeshMapData, ErrStat, ErrMsg, WriteThisStep )
 !...............................................................................................................................
    REAL(DbKi)              , intent(in   ) :: this_time           !< The current simulation time (actual or time of prediction)
    INTEGER(IntKi)          , intent(in   ) :: this_state          !< Index into the state array (current or predicted states)
    LOGICAL                 , intent(in   ) :: calcJacobian        !< Should we calculate Jacobians in Option 1?
 
    TYPE(FAST_ParameterType), INTENT(IN   ) :: p_FAST              !< Parameters for the glue code
+   TYPE(FAST_MiscVarType),   INTENT(IN   ) :: m_FAST              !< Misc variables for the glue code (including external inputs)
 
    TYPE(ElastoDyn_Data),     INTENT(INOUT) :: ED                  !< ElastoDyn data
    TYPE(BeamDyn_Data),       INTENT(INOUT) :: BD                  !< BeamDyn data
@@ -5249,7 +5277,9 @@ SUBROUTINE SolveOption1(this_time, this_state, calcJacobian, p_FAST, ED, BD, HD,
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    ELSEIF ( p_FAST%CompMooring == Module_MD ) THEN
-         
+      
+      CALL MD_SetExternalInputs(p_FAST, m_FAST, MD%m)
+
       CALL MD_CalcOutput( this_time, MD%Input(1), MD%p, MD%x(this_state), MD%xd(this_state), MD%z(this_state), &
                             MD%OtherSt(this_state), MD%y, MD%m, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )

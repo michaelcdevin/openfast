@@ -126,6 +126,7 @@ typedef  ^            ^                IntKi              typeNum        -      
 typedef  ^            ^                IntKi              Attached       {10}    -  -   "list of IdNums of lines attached to this point node"
 typedef  ^            ^                IntKi              Top            {10}    -  -   "list of ints specifying whether each line is attached at 1 = top/fairlead(end B), 0 = bottom/anchor(end A)"
 typedef  ^            ^                IntKi              nAttached      -       0  -   "number of attached lines"
+typedef  ^            ^                IntKi              ExternIdx     -   -   -   "index of external force input (zero means no external force applied)"
 typedef  ^            ^                DbKi               pointM           -       -  -   "point mass" "[kg]"
 typedef  ^            ^                DbKi               pointV           -       -  -   "point volume" "[m^3]"
 typedef  ^            ^                DbKi               pointFX          -       -  -   ""
