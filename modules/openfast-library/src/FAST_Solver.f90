@@ -5277,8 +5277,6 @@ SUBROUTINE SolveOption1(this_time, this_state, calcJacobian, p_FAST, m_FAST, ED,
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    ELSEIF ( p_FAST%CompMooring == Module_MD ) THEN
-      
-      CALL MD_SetExternalInputs(p_FAST, m_FAST, MD%m)
 
       CALL MD_CalcOutput( this_time, MD%Input(1), MD%p, MD%x(this_state), MD%xd(this_state), MD%z(this_state), &
                             MD%OtherSt(this_state), MD%y, MD%m, ErrStat2, ErrMsg2 )

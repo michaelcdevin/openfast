@@ -4230,6 +4230,7 @@ SUBROUTINE FAST_Solution0(p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, O
 
       ! the initial ServoDyn and IfW/Lidar inputs from Simulink:
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )
+   IF ( p_FAST%CompMooring == Module_MD ) CALL MD_SetExternalInput( p_FAST, m_FAST, MD%m )
   
   
    CALL CalcOutputs_And_SolveForInputs(  n_t_global, t_initial,  STATE_CURR, m_FAST%calcJacobian, m_FAST%NextJacCalcTime, &
@@ -4834,6 +4835,7 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
       ! the ServoDyn inputs from Simulink are for t, not t+dt, so we're going to overwrite the inputs from
       ! the previous step before we extrapolate these inputs:
    IF ( p_FAST%CompServo == Module_SrvD ) CALL SrvD_SetExternalInputs( p_FAST, m_FAST, SrvD%Input(1) )
+   IF ( p_FAST%CompMooring == Module_MD ) CALL MD_SetExternalInput( p_FAST, m_FAST, MD%m )
 
    IF ( p_FAST%UseSC ) THEN
       CALL SC_DX_SetOutputs(p_FAST, SrvD%Input(1), SC_DX, ErrStat2, ErrMsg2 )
